@@ -6,7 +6,12 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\ApiAuthController;
 use App\Http\Controllers\IndexController;
-use App\Http\Controllers\TallerController; // ⬅️ importar el controller
+use App\Http\Controllers\Admin\TallerController;
+use App\Http\Controllers\Admin\OrganizadorController;
+use App\Http\Controllers\Admin\ClaseController;
+use App\Http\Controllers\Organizador\TallerController as OrgTallerController;
+use App\Http\Controllers\Organizador\ClaseController as OrgClaseController;
+use App\Http\Controllers\Docente\ClaseController as DocClaseController;
 
 // Rutas Públicas
 Route::get('/', function (\App\Services\UsuariosApiService $api) {
@@ -44,11 +49,42 @@ Route::prefix('auth_api')->name('auth_api.')->group(function () {
 // Rutas Generales de Navegación
 Route::middleware(['api.auth'])->group(function () {
     Route::get('/dashboard', [IndexController::class, 'index'])->name('dashboard');
-
-    // ABM de Talleres (resource, sin show)
-    Route::resource('talleres', TallerController::class)
-        ->except(['show'])
-        ->names('talleres');
 });
+
+// Rutas de admin
+Route::prefix('admin')->name('admin.')->group(function () {
+
+    // LISTADO DE TALLERES (index)
+    Route::get('/talleres', [TallerController::class, 'index'])
+        ->name('talleres.index');
+
+    // LISTADO DE ORGANIZADORES (index)
+    Route::get('/organizadores', [OrganizadorController::class, 'index'])
+        ->name('organizadores.index');
+
+    // Listado de clases
+    Route::get('/clases', [ClaseController::class, 'index'])
+        ->name('clases.index');
+});
+
+Route::prefix('organizador')->name('org.')->group(function () {
+    // LISTADO DE TALLERES (organizador)
+    Route::get('/talleres', [OrgTallerController::class, 'index'])
+        ->name('talleres.index');
+
+    // LISTADO/GESTIÓN DE CLASES (organizador)
+    Route::get('/clases', [OrgClaseController::class, 'index'])
+        ->name('clases.index');
+});
+
+Route::prefix('docente')->name('doc.')->group(function () {
+    // Mis clases (listado del docente)
+    Route::get('/clases', [DocClaseController::class, 'index'])->name('clases.index');
+
+    // Gestión de asistencia: primero elegir la clase (lista filtrable)
+    Route::get('/clases/gestion', [DocClaseController::class, 'gestion'])->name('clases.gestion');
+
+});
+
 
 require __DIR__ . '/auth.php';
