@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\ClaseController;
 use App\Http\Controllers\Organizador\TallerController as OrgTallerController;
 use App\Http\Controllers\Organizador\ClaseController as OrgClaseController;
 use App\Http\Controllers\Docente\ClaseController as DocClaseController;
+use App\Http\Controllers\Admin\DocenteController;
 
 // Rutas Públicas
 Route::get('/', function (\App\Services\UsuariosApiService $api) {
@@ -53,18 +54,33 @@ Route::middleware(['api.auth'])->group(function () {
 
 // Rutas de admin
 Route::prefix('admin')->name('admin.')->group(function () {
+    // Talleres
+    Route::get('/talleres', [TallerController::class, 'index'])->name('talleres.index');
+    Route::post('/talleres', [TallerController::class, 'store'])->name('talleres.store');
+    Route::match(['put', 'patch'], '/talleres/{taller}', [TallerController::class, 'update'])->name('talleres.update');
 
-    // LISTADO DE TALLERES (index)
-    Route::get('/talleres', [TallerController::class, 'index'])
-        ->name('talleres.index');
+    // Organizadores
+    Route::get('/organizadores', [OrganizadorController::class, 'index'])->name('organizadores.index');
+    Route::post('/organizadores', [OrganizadorController::class, 'store'])->name('organizadores.store');
+    Route::match(['put', 'patch'], '/organizadores/{organizador}', [OrganizadorController::class, 'update'])->name('organizadores.update');
 
-    // LISTADO DE ORGANIZADORES (index)
-    Route::get('/organizadores', [OrganizadorController::class, 'index'])
-        ->name('organizadores.index');
+    // Auxiliares para el modal (prefill y check de existencia) de DOCENTES
+    Route::get('docentes/persona/{ci}', [DocenteController::class, 'persona'])
+        ->name('docentes.persona');
+    Route::get('docentes/existe/{ci}', [DocenteController::class, 'existe'])
+        ->name('docentes.existe');
 
-    // Listado de clases
-    Route::get('/clases', [ClaseController::class, 'index'])
-        ->name('clases.index');
+    // Listado + alta/sync (Docentes)
+    Route::resource('docentes', DocenteController::class)
+        ->only(['index', 'store']);
+
+    // Clases
+    Route::get('/clases', [ClaseController::class, 'index'])->name('clases.index');
+    Route::post('/clases', [ClaseController::class, 'store'])->name('clases.store');
+    Route::match(['put', 'patch'], '/clases/{clase}', [ClaseController::class, 'update'])->name('clases.update');
+
+    // Docentes - búsqueda (autocomplete para el modal de Clase)
+    Route::get('/docentes/buscar', [DocenteController::class, 'buscar'])->name('docentes.buscar');
 });
 
 Route::prefix('organizador')->name('org.')->group(function () {
@@ -84,6 +100,11 @@ Route::prefix('docente')->name('doc.')->group(function () {
     // Gestión de asistencia: primero elegir la clase (lista filtrable)
     Route::get('/clases/gestion', [DocClaseController::class, 'gestion'])->name('clases.gestion');
 
+    // Auxiliares para el modal de Organizadores
+    Route::get('/organizadores/persona/{ci}', [OrganizadorController::class, 'persona'])
+        ->name('organizadores.persona');   // proxy a api_personas (por CI)
+    Route::get('/organizadores/existe/{ci}', [OrganizadorController::class, 'existe'])
+        ->name('organizadores.existe');    // existe en tabla local
 });
 
 

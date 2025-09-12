@@ -12,6 +12,7 @@ const sections = [
       { label: 'Talleres', desc: 'ABM de talleres', href: route('admin.talleres.index') },
       { label: 'Organizadores', desc: 'ABM de organizadores', href: route('admin.organizadores.index') },
       { label: 'Clases', desc: 'Listado y gestión', href: route('admin.clases.index') },
+      { label: 'Docentes', desc: 'ABM de docentes', href: route('admin.docentes.index') },
     ],
   },
   {

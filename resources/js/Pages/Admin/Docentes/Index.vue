@@ -2,50 +2,53 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import { Head, router } from "@inertiajs/vue3";
 import { ref } from "vue";
+
 import PrimaryButton from "@/Components/PrimaryButton.vue";
-import OrganizadorModal from "./OrganizadorModal.vue";
-import Modal from "@/Components/Modal.vue";
 import SecondaryButton from "@/Components/SecondaryButton.vue";
+import TextInput from "@/Components/TextInput.vue";
+import Modal from "@/Components/Modal.vue";
+
+// ⬇️ cambiá el import si tu modal vive en otra ruta
+import DocenteModal from "./DocenteModal.vue";
 
 const props = defineProps({
-  // lista enviada desde el controller
-  organizadores: {
+  // listado enviado desde el controller
+  docentes: {
     type: Array,
     default: () => [],
   },
-  // catálogo de talleres (id, nombre) enviado desde el controller
+  // catálogo de talleres (id, nombre) por si los usás en chips/filtros
   talleres: {
     type: Array,
     default: () => [],
   },
   filtros: {
     type: Object,
-    default: () => ({ busqueda: "", taller: "", nombre: "" })
+    default: () => ({ busqueda: "", taller: "", nombre: "" }),
   },
 });
-
 
 const showModal = ref(false);
 const editing = ref(null);
 const mostrarModalFiltros = ref(false);
+
 const filtros = ref({
   busqueda: props.filtros?.busqueda ?? "",
   taller: props.filtros?.taller ?? "",
   nombre: props.filtros?.nombre ?? "",
 });
 
-
 const openNew = () => {
   editing.value = null;
   showModal.value = true;
 };
-const openEdit = (org) => {
-  editing.value = org;
+const openEdit = (doc) => {
+  editing.value = doc;
   showModal.value = true;
 };
 const closeModal = () => (showModal.value = false);
 const handleSaved = () => {
-  // No hace falta nada: el POST redirige al index y recarga la lista
+  // Nada especial; el store/update puede redirigir al index
 };
 
 const aplicarFiltros = () => {
@@ -54,9 +57,9 @@ const aplicarFiltros = () => {
     taller: filtros.value.taller || undefined,
     nombre: filtros.value.nombre?.trim() || undefined,
   };
-  Object.keys(params).forEach((k) => params[k] === undefined && delete params[k]);
+  Object.keys(params).forEach(k => params[k] === undefined && delete params[k]);
 
-  router.get(route("admin.organizadores.index"), params, {
+  router.get(route("admin.docentes.index"), params, {
     preserveScroll: true,
     preserveState: true,
   });
@@ -65,7 +68,7 @@ const aplicarFiltros = () => {
 
 const limpiarFiltros = () => {
   filtros.value = { busqueda: "", taller: "", nombre: "" };
-  router.get(route("admin.organizadores.index"), {}, {
+  router.get(route("admin.docentes.index"), {}, {
     preserveScroll: true,
     preserveState: true,
   });
@@ -74,17 +77,17 @@ const limpiarFiltros = () => {
 
 <template>
 
-  <Head title="Organizadores (Administrador)" />
+  <Head title="Docentes (Administrador)" />
 
   <AuthenticatedLayout>
     <!-- Header -->
     <template #header>
       <div>
         <h2 class="text-xl font-semibold leading-tight text-gray-800">
-          Organizadores (Administrador)
+          Docentes (Administrador)
         </h2>
         <p class="text-sm text-gray-600">
-          Alta/mantenimiento de organizadores y sincronización con Registro de Personas.
+          Alta/mantenimiento de docentes y sincronización con Registro de Personas.
         </p>
       </div>
     </template>
@@ -94,23 +97,22 @@ const limpiarFiltros = () => {
         <!-- Encabezado + botón -->
         <div class="mb-6 flex items-center justify-between">
           <div>
-            <h3 class="text-lg font-medium text-gray-900 mb-1">Gestión de Organizadores</h3>
+            <h3 class="text-lg font-medium text-gray-900 mb-1">Gestión de Docentes</h3>
             <p class="text-sm text-gray-600">
               Hacé clic en una fila para sincronizar datos de la persona.
             </p>
           </div>
           <div class="flex gap-2">
-            <PrimaryButton @click="mostrarModalFiltros = true">🔎︎ Filtros</PrimaryButton>
-            <PrimaryButton @click="openNew()">+ Nuevo Organizador</PrimaryButton>
+            <PrimaryButton @click="() => (mostrarModalFiltros = true)">🔎︎ Filtros</PrimaryButton>
+            <PrimaryButton @click="openNew()">+ Nuevo Docente</PrimaryButton>
           </div>
         </div>
 
+        <!-- Banner filtros activos (solo si hay filtros) -->
         <div v-if="filtros.busqueda || filtros.taller || filtros.nombre"
           class="mb-4 rounded-md border border-gray-200 bg-gray-50 px-4 py-3">
           <div class="flex items-start justify-between gap-3">
-            <!-- Etiqueta/leyenda -->
             <div class="flex items-center gap-2">
-              <!-- icono info -->
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" class="h-5 w-5 text-gray-600"
                 fill="currentColor" aria-hidden="true">
                 <path
@@ -119,13 +121,11 @@ const limpiarFiltros = () => {
               <span class="text-sm font-medium text-gray-700">Filtros activos</span>
             </div>
 
-            <!-- Botón limpiar con mismo estilo del proyecto -->
             <SecondaryButton @click="limpiarFiltros" class="!py-1 !px-3 text-sm">
               Limpiar filtros
             </SecondaryButton>
           </div>
 
-          <!-- Chips -->
           <div class="mt-3 flex flex-wrap items-center gap-2">
             <span v-if="filtros.busqueda"
               class="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-800 px-2.5 py-0.5 text-xs">
@@ -162,30 +162,30 @@ const limpiarFiltros = () => {
                       Nombre y Apellido
                     </th>
                     <th class="w-7/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Talleres que organiza
+                      Talleres en los que dicta
                     </th>
                   </tr>
                 </thead>
 
                 <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="org in props.organizadores" :key="org.ci" @click="openEdit(org)"
+                  <tr v-for="doc in props.docentes" :key="doc.ci" @click="openEdit(doc)"
                     class="hover:bg-gray-50 hover:scale-95 transform transition-all duration-200 ease-in-out cursor-pointer">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {{ org.ci }}
+                      {{ doc.ci }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <span v-if="org.nombre || org.apellido">
-                        {{ [org.nombre, org.apellido].filter(Boolean).join(' ') }}
+                      <span v-if="doc.nombre || doc.apellido">
+                        {{ [doc.nombre, doc.apellido].filter(Boolean).join(' ') }}
                       </span>
                       <span v-else class="text-gray-500">—</span>
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-900">
                       <div class="flex flex-wrap gap-2">
-                        <span v-for="taller in org.talleres" :key="taller.id"
+                        <span v-for="taller in (doc.talleres_dicta || [])" :key="taller.id"
                           class="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-3 py-0.5 text-xs font-medium">
                           {{ taller.nombre }}
                         </span>
-                        <span v-if="!org.talleres || org.talleres.length === 0" class="text-gray-500">
+                        <span v-if="!doc.talleres_dicta || doc.talleres_dicta.length === 0" class="text-gray-500">
                           —
                         </span>
                       </div>
@@ -193,9 +193,9 @@ const limpiarFiltros = () => {
                   </tr>
 
                   <!-- Vacío -->
-                  <tr v-if="props.organizadores.length === 0">
+                  <tr v-if="props.docentes.length === 0">
                     <td colspan="3" class="px-6 py-12 text-center text-gray-500">
-                      No hay organizadores para mostrar.
+                      No hay docentes para mostrar.
                     </td>
                   </tr>
                 </tbody>
@@ -207,11 +207,11 @@ const limpiarFiltros = () => {
       </div>
     </div>
 
-    <!-- Modal -->
-    <OrganizadorModal :show="showModal" :editing="editing" :talleres="props.talleres" @close="closeModal"
-      @saved="handleSaved" />
+    <!-- Modal crear/editar -->
+    <DocenteModal :show="showModal" :editing="editing" @close="closeModal" @saved="handleSaved" />
 
-    <Modal :show="mostrarModalFiltros" @close="() => (mostrarModalFiltros.value = false)">
+    <!-- Modal de filtros -->
+    <Modal :show="mostrarModalFiltros" @close="() => (mostrarModalFiltros = false)">
       <div class="p-6 w-full max-w-md">
         <h2 class="text-lg font-semibold text-gray-800 mb-4">Filtros</h2>
 
@@ -265,6 +265,5 @@ const limpiarFiltros = () => {
         </form>
       </div>
     </Modal>
-
   </AuthenticatedLayout>
 </template>

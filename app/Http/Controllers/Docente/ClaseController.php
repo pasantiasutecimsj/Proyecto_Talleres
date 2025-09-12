@@ -28,8 +28,4 @@ class ClaseController extends Controller
             'title' => 'Asistentes por clase (Docente)',
         ]);
     }
-
-    // Próximos pasos:
-    // public function show(Clase $clase) { ... }   // detalle: asistentes + marcar asistencia
-    // public function mark(Request $request, Clase $clase, $ci) { ... } // marcar asistencia
 }
