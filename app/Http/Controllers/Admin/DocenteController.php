@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Docente;
+use App\Models\Clase;                     // 👈 NUEVO
 use App\Services\RegistroPersonasService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;        // 👈 NUEVO
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -173,47 +175,6 @@ class DocenteController extends Controller
         return response()->json(['existe' => $exists], 200);
     }
 
-    /* ============================
-       Helpers privados
-       ============================ */
-
-    private function personaCacheKey(string $ci): string
-    {
-        return "api_personas:persona:{$ci}";
-    }
-
-    private function personaFromApi(string $ci): ?array
-    {
-        try {
-            $res = $this->personas->getPersona($ci);
-            if ($res->failed()) return null;
-            return $res->json('persona') ?? null;
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-     /** Normaliza: lowercase + sin acentos + trim */
-    private function norm(?string $s): string
-    {
-        if ($s === null) return '';
-        return Str::of($s)->lower()->ascii()->trim()->value();
-    }
-
-    private function personaFromApiCached(string $ci): ?array
-    {
-        return Cache::remember("api_personas:persona:{$ci}", 1800, function () use ($ci) {
-            try {
-                $res = $this->personas->getPersona($ci);
-                if ($res->failed()) return null;
-                $json = $res->json();
-                return $json['persona'] ?? null;
-            } catch (\Throwable) {
-                return null;
-            }
-        });
-    }
-
     /** GET /admin/docentes/buscar?q=...  ->  [{ci,nombre,apellido}] */
     public function buscar(Request $request)
     {
@@ -259,5 +220,91 @@ class DocenteController extends Controller
         }
 
         return response()->json($found, 200);
+    }
+
+    /**
+     * GET /admin/docentes/top?taller_id=ID[&limit=20]
+     * Devuelve docentes ordenados por cantidad de clases dictadas en el taller dado.
+     * Respuesta: [{ ci, nombre|null, clases_count }]
+     */
+    public function top(Request $request)
+    {
+        $data = $request->validate([
+            'taller_id' => ['required', 'integer', 'exists:talleres,id'],
+            'limit'     => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $tallerId = (int) $data['taller_id'];
+        $limit    = (int) ($data['limit'] ?? 20);
+
+        // Agrupar clases por docente en el taller seleccionado
+        $rows = Clase::query()
+            ->select('ci_docente', DB::raw('COUNT(*) as clases_count'))
+            ->where('taller_id', $tallerId)
+            ->whereNotNull('ci_docente')
+            ->groupBy('ci_docente')
+            ->orderByDesc('clases_count')
+            ->limit($limit)
+            ->get();
+
+        // Enriquecer con nombre desde Registro de Personas (cache 30')
+        $result = $rows->map(function ($r) {
+            $ci = (string) $r->ci_docente;
+            $p  = $this->personaFromApiCached($ci);
+
+            $nombreCompleto = trim(implode(' ', array_filter([
+                $p['nombre']   ?? null,
+                $p['apellido'] ?? null,
+            ])));
+
+            return [
+                'ci'           => $ci,
+                'nombre'       => $nombreCompleto !== '' ? $nombreCompleto : null,
+                'clases_count' => (int) $r->clases_count,
+            ];
+        })->values();
+
+        return response()->json($result, 200);
+    }
+
+    /* ============================
+       Helpers privados
+       ============================ */
+
+    private function personaCacheKey(string $ci): string
+    {
+        return "api_personas:persona:{$ci}";
+    }
+
+    private function personaFromApi(string $ci): ?array
+    {
+        try {
+            $res = $this->personas->getPersona($ci);
+            if ($res->failed()) return null;
+            return $res->json('persona') ?? null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+     /** Normaliza: lowercase + sin acentos + trim */
+    private function norm(?string $s): string
+    {
+        if ($s === null) return '';
+        return Str::of($s)->lower()->ascii()->trim()->value();
+    }
+
+    private function personaFromApiCached(string $ci): ?array
+    {
+        return Cache::remember("api_personas:persona:{$ci}", 1800, function () use ($ci) {
+            try {
+                $res = $this->personas->getPersona($ci);
+                if ($res->failed()) return null;
+                $json = $res->json();
+                return $json['persona'] ?? null;
+            } catch (\Throwable) {
+                return null;
+            }
+        });
     }
 }

@@ -103,9 +103,15 @@ Route::prefix('docente')->name('doc.')->group(function () {
     // Auxiliares para el modal de Organizadores
     Route::get('/organizadores/persona/{ci}', [OrganizadorController::class, 'persona'])
         ->name('organizadores.persona');   // proxy a api_personas (por CI)
+
     Route::get('/organizadores/existe/{ci}', [OrganizadorController::class, 'existe'])
         ->name('organizadores.existe');    // existe en tabla local
+
+    // Ranking de docentes por taller (para el modal de clases)
+    Route::get('/docentes/top', [\App\Http\Controllers\Admin\DocenteController::class, 'top'])
+        ->name('docentes.top');
 });
+
 
 
 require __DIR__ . '/auth.php';
