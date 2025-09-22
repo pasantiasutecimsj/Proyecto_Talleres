@@ -27,11 +27,23 @@ class DocenteController extends Controller
     {
         $busquedaCi = trim((string) $request->input('busqueda', '')); // por CI
         $nombreTerm = trim((string) $request->input('nombre', ''));   // por nombre/apellido (API)
+        $tallerId   = $request->filled('taller') ? (int) $request->input('taller') : null; // 👈 NUEVO
 
         // 1) Filtro local por CI
         $q = \App\Models\Docente::query()->orderBy('ci');
+
         if ($busquedaCi !== '') {
             $q->where('ci', 'like', "%{$busquedaCi}%");
+        }
+
+        // 👉 Filtro por taller: solo docentes que tengan al menos 1 clase en ese taller
+        if ($tallerId) {
+            $q->whereExists(function ($sub) use ($tallerId) {
+                $sub->select(DB::raw(1))
+                    ->from('clases')
+                    ->whereColumn('clases.ci_docente', 'docentes.ci')
+                    ->where('clases.taller_id', $tallerId);
+            });
         }
 
         $docentes = $q->get();
@@ -71,7 +83,7 @@ class DocenteController extends Controller
             })->values();
         }
 
-        // 4) Traer, para los docentes visibles, los talleres que dictaron (distinct por docente)
+        // 4) Talleres en los que dictaron (distinct por docente)
         $cis = $enriquecidos->pluck('ci')->all();
 
         $talleresPorDocente = collect();
@@ -88,20 +100,30 @@ class DocenteController extends Controller
                 });
         }
 
-        // 5) Adjuntar la lista a cada docente (prop distinta para no confundir con relaciones)
+        // 5) Adjuntar la lista a cada docente
         $enriquecidos = $enriquecidos->map(function ($doc) use ($talleresPorDocente) {
             $doc->talleres_dicta = $talleresPorDocente->get($doc->ci, []);
             return $doc;
         });
 
+        // 👇 NUEVO: catálogo de talleres para el modal de filtros
+        // (solo talleres que tienen clases cargadas)
+        $talleres = \App\Models\Taller::select('id', 'nombre')
+            ->whereIn('id', \App\Models\Clase::query()->distinct()->pluck('taller_id'))
+            ->orderBy('nombre')
+            ->get();
+
         return Inertia::render('Admin/Docentes/Index', [
             'docentes' => $enriquecidos,
+            'talleres' => $talleres, // 👈 NUEVO
             'filtros'  => [
                 'busqueda' => $busquedaCi,
                 'nombre'   => $nombreTerm,
+                'taller'   => $tallerId ? (string)$tallerId : '', // 👈 NUEVO
             ],
         ]);
     }
+
 
 
     /**
@@ -287,7 +309,7 @@ class DocenteController extends Controller
         }
     }
 
-     /** Normaliza: lowercase + sin acentos + trim */
+    /** Normaliza: lowercase + sin acentos + trim */
     private function norm(?string $s): string
     {
         if ($s === null) return '';
