@@ -4,8 +4,8 @@ import { Head, router } from "@inertiajs/vue3";
 import { ref } from "vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
 import OrganizadorModal from "./OrganizadorModal.vue";
-import Modal from "@/Components/Modal.vue";
 import SecondaryButton from "@/Components/SecondaryButton.vue";
+import OrganizadorFiltrosModal from "./OrganizadorFiltrosModal.vue";
 
 const props = defineProps({
   // lista enviada desde el controller
@@ -24,9 +24,10 @@ const props = defineProps({
   },
 });
 
-
 const showModal = ref(false);
 const editing = ref(null);
+
+// Filtros (controlados por el padre)
 const mostrarModalFiltros = ref(false);
 const filtros = ref({
   busqueda: props.filtros?.busqueda ?? "",
@@ -34,7 +35,7 @@ const filtros = ref({
   nombre: props.filtros?.nombre ?? "",
 });
 
-
+// ====== ABM ======
 const openNew = () => {
   editing.value = null;
   showModal.value = true;
@@ -48,7 +49,8 @@ const handleSaved = () => {
   // No hace falta nada: el POST redirige al index y recarga la lista
 };
 
-const aplicarFiltros = () => {
+// ====== Acciones de filtros (navegan al servidor) ======
+const navegarConFiltros = () => {
   const params = {
     busqueda: filtros.value.busqueda?.trim() || undefined,
     taller: filtros.value.taller || undefined,
@@ -60,6 +62,10 @@ const aplicarFiltros = () => {
     preserveScroll: true,
     preserveState: true,
   });
+};
+
+const aplicarFiltros = () => {
+  navegarConFiltros();
   mostrarModalFiltros.value = false;
 };
 
@@ -73,7 +79,6 @@ const limpiarFiltros = () => {
 </script>
 
 <template>
-
   <Head title="Organizadores (Administrador)" />
 
   <AuthenticatedLayout>
@@ -105,21 +110,22 @@ const limpiarFiltros = () => {
           </div>
         </div>
 
-        <div v-if="filtros.busqueda || filtros.taller || filtros.nombre"
-          class="mb-4 rounded-md border border-gray-200 bg-gray-50 px-4 py-3">
+        <!-- Filtros activos -->
+        <div
+          v-if="filtros.busqueda || filtros.taller || filtros.nombre"
+          class="mb-4 rounded-md border border-gray-200 bg-gray-50 px-4 py-3"
+        >
           <div class="flex items-start justify-between gap-3">
-            <!-- Etiqueta/leyenda -->
             <div class="flex items-center gap-2">
-              <!-- icono info -->
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" class="h-5 w-5 text-gray-600"
-                fill="currentColor" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"
+                   class="h-5 w-5 text-gray-600" fill="currentColor" aria-hidden="true">
                 <path
-                  d="M480-120q-75 0-140.5-28.5T226-226q-49-49-77.5-114.5T120-480q0-75 28.5-140.5T226-734q49-49 114.5-77.5T480-840q75 0 140.5 28.5T734-734q49 49 77.5 114.5T840-480q0 75-28.5 140.5T734-226q-49 49-114.5 77.5T480-120Zm0-60q135 0 232.5-97.5T810-480q0-135-97.5-232.5T480-810q-135 0-232.5 97.5T150-480q0 135 97.5 232.5T480-180Zm0-420q-17 0-28.5-11.5T440-640q0-17 11.5-28.5T480-680q17 0 28.5 11.5T520-640q0 17-11.5 28.5T480-600Zm-40 320h80v-240h-80v240Z" />
+                  d="M480-120q-75 0-140.5-28.5T226-226q-49-49-77.5-114.5T120-480q0-75 28.5-140.5T226-734q49-49 114.5-77.5T480-840q75 0 140.5 28.5T734-734q49 49 77.5 114.5T840-480q0 75-28.5 140.5T734-226q-49 49-114.5 77.5T480-120Zm0-60q135 0 232.5-97.5T810-480q0-135-97.5-232.5T480-810q-135 0-232.5 97.5T150-480q0 135 97.5 232.5T480-180Zm0-420q-17 0-28.5-11.5T440-640q0-17 11.5-28.5T480-680q17 0 28.5 11.5T520-640q0 17-11.5 28.5T480-600Zm-40 320h80v-240h-80v240Z"
+                />
               </svg>
               <span class="text-sm font-medium text-gray-700">Filtros activos</span>
             </div>
 
-            <!-- Botón limpiar con mismo estilo del proyecto -->
             <SecondaryButton @click="limpiarFiltros" class="!py-1 !px-3 text-sm">
               Limpiar filtros
             </SecondaryButton>
@@ -127,18 +133,24 @@ const limpiarFiltros = () => {
 
           <!-- Chips -->
           <div class="mt-3 flex flex-wrap items-center gap-2">
-            <span v-if="filtros.busqueda"
-              class="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-800 px-2.5 py-0.5 text-xs">
+            <span
+              v-if="filtros.busqueda"
+              class="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-800 px-2.5 py-0.5 text-xs"
+            >
               <strong class="font-semibold">CI:</strong> {{ filtros.busqueda }}
             </span>
 
-            <span v-if="filtros.nombre"
-              class="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-800 px-2.5 py-0.5 text-xs">
+            <span
+              v-if="filtros.nombre"
+              class="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-800 px-2.5 py-0.5 text-xs"
+            >
               <strong class="font-semibold">Nombre:</strong> {{ filtros.nombre }}
             </span>
 
-            <span v-if="filtros.taller"
-              class="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-800 px-2.5 py-0.5 text-xs">
+            <span
+              v-if="filtros.taller"
+              class="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-800 px-2.5 py-0.5 text-xs"
+            >
               <strong class="font-semibold">Taller:</strong>
               {{
                 (props.talleres.find(t => String(t.id) === String(filtros.taller))?.nombre)
@@ -168,8 +180,12 @@ const limpiarFiltros = () => {
                 </thead>
 
                 <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="org in props.organizadores" :key="org.ci" @click="openEdit(org)"
-                    class="hover:bg-gray-50 hover:scale-95 transform transition-all duration-200 ease-in-out cursor-pointer">
+                  <tr
+                    v-for="org in props.organizadores"
+                    :key="org.ci"
+                    @click="openEdit(org)"
+                    class="hover:bg-gray-50 hover:scale-95 transform transition-all duration-200 ease-in-out cursor-pointer"
+                  >
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {{ org.ci }}
                     </td>
@@ -181,8 +197,11 @@ const limpiarFiltros = () => {
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-900">
                       <div class="flex flex-wrap gap-2">
-                        <span v-for="taller in org.talleres" :key="taller.id"
-                          class="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-3 py-0.5 text-xs font-medium">
+                        <span
+                          v-for="taller in org.talleres"
+                          :key="taller.id"
+                          class="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-3 py-0.5 text-xs font-medium"
+                        >
                           {{ taller.nombre }}
                         </span>
                         <span v-if="!org.talleres || org.talleres.length === 0" class="text-gray-500">
@@ -207,64 +226,23 @@ const limpiarFiltros = () => {
       </div>
     </div>
 
-    <!-- Modal -->
-    <OrganizadorModal :show="showModal" :editing="editing" :talleres="props.talleres" @close="closeModal"
-      @saved="handleSaved" />
+    <!-- Modal ABM -->
+    <OrganizadorModal
+      :show="showModal"
+      :editing="editing"
+      :talleres="props.talleres"
+      @close="closeModal"
+      @saved="handleSaved"
+    />
 
-    <Modal :show="mostrarModalFiltros" @close="() => (mostrarModalFiltros.value = false)">
-      <div class="p-6 w-full max-w-md">
-        <h2 class="text-lg font-semibold text-gray-800 mb-4">Filtros</h2>
-
-        <form @submit.prevent="aplicarFiltros" class="space-y-4">
-          <!-- Buscar por CI -->
-          <div>
-            <label for="f-busqueda" class="block text-sm font-medium text-gray-700">Buscar por CI</label>
-            <input id="f-busqueda" v-model="filtros.busqueda" type="text"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-azul focus:ring-azul sm:text-sm"
-              placeholder="Ej. 12345678" />
-          </div>
-
-          <!-- Buscar por Nombre / Apellido -->
-          <div>
-            <label for="f-nombre" class="block text-sm font-medium text-gray-700">Nombre o Apellido</label>
-            <input id="f-nombre" v-model="filtros.nombre" type="text"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-azul focus:ring-azul sm:text-sm"
-              placeholder="Ej. María Pérez" />
-            <p class="text-xs text-gray-500 mt-1">
-              Filtra usando los datos provenientes de Registro de Personas (con cache).
-            </p>
-          </div>
-
-          <!-- Taller -->
-          <div>
-            <label for="f-taller" class="block text-sm font-medium text-gray-700">Taller</label>
-            <select id="f-taller" v-model="filtros.taller"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-azul focus:ring-azul sm:text-sm">
-              <option value="">Todos</option>
-              <option v-for="t in props.talleres" :key="t.id" :value="t.id">
-                {{ t.nombre }}
-              </option>
-            </select>
-          </div>
-
-          <div class="flex justify-between gap-2 pt-2">
-            <button type="button" @click="limpiarFiltros"
-              class="px-4 py-2 text-sm text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
-              Limpiar
-            </button>
-            <div class="flex gap-2">
-              <button type="button" @click="mostrarModalFiltros = false"
-                class="px-4 py-2 text-sm text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
-                Cancelar
-              </button>
-              <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700">
-                Aplicar filtros
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </Modal>
-
+    <!-- Modal Filtros (componente hijo) -->
+    <OrganizadorFiltrosModal
+      :show="mostrarModalFiltros"
+      :talleres="props.talleres"
+      v-model:filtros="filtros"
+      @close="mostrarModalFiltros = false"
+      @apply="aplicarFiltros"
+      @clear="limpiarFiltros"
+    />
   </AuthenticatedLayout>
 </template>
