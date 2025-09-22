@@ -209,7 +209,7 @@ const limpiarFiltros = () => {
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {{ taller.nombre }}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td class="px-6 py-4 text-sm text-gray-900">
                       <span class="line-clamp-2">{{ taller.descripcion || '—' }}</span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
