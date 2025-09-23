@@ -20,8 +20,8 @@ const sections = [
     title: 'Backoffice Organizador',
     requiredRoles: ['organizador'],
     items: [
-      { label: 'Talleres', desc: 'Listado y mantenimiento', href: route('org.talleres.index') },
-      { label: 'Clases', desc: 'Organizar y crear clases', href: route('org.clases.index') },
+      { label: 'Talleres', desc: 'Listado y mantenimiento', href: route('organizador.talleres.index') }, // o '/organizador/talleres'
+      { label: 'Clases', desc: 'Organizar y crear clases', href: route('organizador.clases.index') },   // o '/organizador/clases'
     ],
   },
   {
@@ -31,16 +31,6 @@ const sections = [
     items: [
       { label: 'Mis clases', desc: 'Agenda del docente', href: route('doc.clases.index') },
       { label: 'Asistentes por clase', desc: 'Ver y marcar asistencia', href: route('doc.clases.gestion') },
-    ],
-  },
-  {
-    key: 'publica',
-    title: 'Página Pública',
-    requiredRoles: [], // Si no tiene rol, cualquiera la ve
-    items: [
-      { label: 'Talleres activos', desc: 'Filtrar por ciudad', href: '#' },
-      { label: 'Próximas clases del taller', desc: 'Calendario', href: '#' },
-      { label: 'Anotarse a una clase', desc: 'Formulario de inscripción', href: '#' },
     ],
   },
 ]

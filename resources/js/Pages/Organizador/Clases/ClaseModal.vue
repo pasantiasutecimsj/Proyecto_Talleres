@@ -6,42 +6,42 @@ import { ref, computed, watch } from "vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
 import SecondaryButton from "@/Components/SecondaryButton.vue";
 
+// Reutilizamos el modal y el modal de filtros del Admin
 import ClaseModal from "@/Pages/Admin/Clases/ClaseModal.vue";
 import ClaseFiltrosModal from "@/Pages/Admin/Clases/ClaseFiltrosModal.vue";
 
 const props = defineProps({
-  clases:        { type: Array,  default: () => [] }, // [{ id, fecha_hora, asistentes_maximos, taller:{id,nombre}, docente:{ci, nombre?, apellido?} }]
-  talleres:      { type: Array,  default: () => [] }, // [{ id, nombre }]
-  organizadores: { type: Array,  default: () => [] }, // [{ ci, nombre?, apellido? }]
-  filtros:       { type: Object, default: () => ({ organizador: "", q: "", taller: "", desde: "", hasta: "" }) },
+  clases:       { type: Array,  default: () => [] },  // [{ id, fecha_hora, asistentes_maximos, taller:{id,nombre}, docente:{ci,nombre?,apellido?} }]
+  talleres:     { type: Array,  default: () => [] },  // talleres del organizador (para el modal)
+  ciudades:     { type: Array,  default: () => [] },  // [{id,nombre}]
+  organizadores:{ type: Array,  default: () => [] },  // [{ci, nombre?, apellido?}]
+  filtros:      { type: Object, default: () => ({ organizador: "", q: "", taller: "", desde: "", hasta: "" }) },
 });
 
 /* =========================
-   Estado UI / filtros
+   Estado UI
    ========================= */
-const mostrarModalFiltros = ref(false);
 const showModal = ref(false);
-const editing = ref(null);
+const editing   = ref(null);
 
-// estado de filtros hidratado desde props
+const mostrarModalFiltros = ref(false);
 const filtros = ref({
   organizador: props.filtros?.organizador ?? "",
-  q:           props.filtros?.q           ?? "",
-  taller:      props.filtros?.taller      ?? "",
-  desde:       props.filtros?.desde       ?? "",
-  hasta:       props.filtros?.hasta       ?? "",
+  q:           props.filtros?.q ?? "",
+  taller:      props.filtros?.taller ?? "",
+  desde:       props.filtros?.desde ?? "",
+  hasta:       props.filtros?.hasta ?? "",
 });
 
-// valor del <select> (se mantiene en sync con filtros.organizador)
 const selectedOrganizador = ref(filtros.value.organizador || "");
 
 /* =========================
-   Orden/labels para UI
+   Helpers de UI
    ========================= */
 const sortedOrganizadores = computed(() =>
   [...props.organizadores].sort((a, b) => {
-    const an = [a?.nombre, a?.apellido, a?.ci].filter(Boolean).join(" ").toLowerCase();
-    const bn = [b?.nombre, b?.apellido, b?.ci].filter(Boolean).join(" ").toLowerCase();
+    const an = [a.nombre, a.apellido, a.ci].filter(Boolean).join(" ").toLowerCase();
+    const bn = [b.nombre, b.apellido, b.ci].filter(Boolean).join(" ").toLowerCase();
     return an.localeCompare(bn);
   })
 );
@@ -51,6 +51,31 @@ const displayOrganizador = (ci) => {
   if (!o) return ci || "";
   const nom = [o.nombre, o.apellido].filter(Boolean).join(" ");
   return nom ? `${nom} · ${o.ci}` : o.ci;
+};
+
+const fmtFechaHora = (isoLike) => {
+  if (!isoLike) return "—";
+  const d = new Date(isoLike);
+  if (isNaN(d.getTime())) return isoLike;
+  try {
+    return new Intl.DateTimeFormat("es-UY", {
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit",
+    }).format(d);
+  } catch {
+    return d.toLocaleString?.() ?? String(isoLike);
+  }
+};
+const isPasada = (isoLike) => {
+  if (!isoLike) return false;
+  const d = new Date(isoLike);
+  if (isNaN(d.getTime())) return false;
+  return d.getTime() < Date.now();
+};
+const docenteLabel = (clase) => {
+  const d = clase?.docente ?? {};
+  const base = [d.nombre, d.apellido].filter(Boolean).join(" ");
+  return base || d.ci || "—";
 };
 
 /* =========================
@@ -68,65 +93,45 @@ const navegar = () => {
 
   router.get(route("organizador.clases.index"), params, {
     preserveScroll: true,
-    preserveState:  false,
+    preserveState: false,
   });
 };
 
-// al cambiar organizador refresca inmediatamente
+// Cambiar organizador refresca inmediatamente
 watch(selectedOrganizador, (ci) => {
   filtros.value.organizador = ci || "";
   navegar();
 });
 
 /* =========================
-   Acciones UI
+   Acciones ABM
+   ========================= */
+const openEdit = (clase) => {
+  editing.value = clase;
+  showModal.value = true;
+};
+const closeModal = () => {
+  showModal.value = false;
+  editing.value = null;
+};
+const handleSaved = () => {
+  // El PUT/POST redirige/recarga desde el backend; cerramos modal por UX.
+  closeModal();
+};
+
+/* =========================
+   Acciones filtros
    ========================= */
 const aplicarFiltros = () => {
   mostrarModalFiltros.value = false;
   navegar();
 };
-
 const limpiarFiltros = () => {
   filtros.value = { ...filtros.value, q: "", taller: "", desde: "", hasta: "" };
   navegar();
 };
-
-/* ===============
-   ABM (modal)
-   =============== */
-const openNew  = () => { editing.value = null; showModal.value = true; };
-const openEdit = (clase) => { editing.value = clase; showModal.value = true; };
-const closeModal = () => { showModal.value = false; editing.value = null; };
-const handleSaved = () => { /* el POST/PUT redirige / recarga desde backend */ };
-
-/* ===============
-   Helpers de UI
-   =============== */
-const fmtFechaHora = (isoLike) => {
-  if (!isoLike) return "—";
-  const d = new Date(isoLike);
-  if (isNaN(d.getTime())) return isoLike;
-  try {
-    return new Intl.DateTimeFormat("es-UY", {
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit",
-    }).format(d);
-  } catch {
-    return d.toLocaleString?.() ?? String(isoLike);
-  }
-};
-
-const isPasada = (isoLike) => {
-  if (!isoLike) return false;
-  const d = new Date(isoLike);
-  if (isNaN(d.getTime())) return false;
-  return d.getTime() < Date.now();
-};
-
-const docenteLabel = (clase) => {
-  const d = clase?.docente ?? {};
-  const base = [d.nombre, d.apellido].filter(Boolean).join(" ");
-  return base || d.ci || "—";
+const limpiarOrganizador = () => {
+  selectedOrganizador.value = ""; // el watcher navega
 };
 </script>
 
@@ -134,20 +139,22 @@ const docenteLabel = (clase) => {
   <Head title="Clases por Organizador" />
 
   <AuthenticatedLayout>
+    <!-- Header -->
     <template #header>
       <div>
         <h2 class="text-xl font-semibold leading-tight text-gray-800">
           Clases por Organizador
         </h2>
         <p class="text-sm text-gray-600">
-          Elegí un organizador y filtrá por docente/taller y rango de fechas.
+          Seleccioná un organizador para ver y editar las clases de sus talleres.
         </p>
       </div>
     </template>
 
     <div class="py-12">
       <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-        <!-- Top row: selector de organizador + acciones -->
+
+        <!-- Selector de organizador + acciones -->
         <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div class="flex-1">
             <label for="sel-organizador" class="block text-sm font-medium text-gray-700">
@@ -168,7 +175,7 @@ const docenteLabel = (clase) => {
               <SecondaryButton
                 v-if="selectedOrganizador"
                 class="shrink-0"
-                @click="() => (selectedOrganizador = '')"
+                @click="limpiarOrganizador"
               >
                 Limpiar
               </SecondaryButton>
@@ -180,11 +187,10 @@ const docenteLabel = (clase) => {
 
           <div class="flex gap-2 self-start sm:self-auto">
             <PrimaryButton @click="() => (mostrarModalFiltros = true)">🔎︎ Filtros</PrimaryButton>
-            <PrimaryButton @click="openNew()">+ Nueva Clase</PrimaryButton>
           </div>
         </div>
 
-        <!-- Chips de filtros activos -->
+        <!-- Banner: filtros activos -->
         <div
           v-if="selectedOrganizador || filtros.q || filtros.taller || filtros.desde || filtros.hasta"
           class="mb-4 rounded-md border border-gray-200 bg-gray-50 px-4 py-3"
@@ -197,8 +203,9 @@ const docenteLabel = (clase) => {
               </svg>
               <span class="text-sm font-medium text-gray-700">Filtros activos</span>
             </div>
+
             <SecondaryButton @click="limpiarFiltros" class="!py-1 !px-3 text-sm">
-              Limpiar filtros (docente/taller/fechas)
+              Limpiar filtros
             </SecondaryButton>
           </div>
 
@@ -218,8 +225,7 @@ const docenteLabel = (clase) => {
 
             <span v-if="filtros.taller"
               class="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-800 px-2.5 py-0.5 text-xs">
-              <strong class="font-semibold">Taller:</strong>
-              {{ (props.talleres.find(t => String(t.id) === String(filtros.taller))?.nombre) || filtros.taller }}
+              <strong class="font-semibold">Taller:</strong> {{ filtros.taller }}
             </span>
 
             <span v-if="filtros.desde"
@@ -239,7 +245,7 @@ const docenteLabel = (clase) => {
           <div class="p-6 text-gray-900">
             <div class="overflow-x-auto">
               <p class="text-gray-600 mb-4">
-                → Seleccioná un organizador y utilizá los filtros para refinar el listado.
+                → Hacé clic en una fila para <strong>editar</strong> la clase.
               </p>
 
               <table class="min-w-full table-auto">
@@ -273,25 +279,19 @@ const docenteLabel = (clase) => {
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {{ fmtFechaHora(cl.fecha_hora) }}
                     </td>
-
                     <td class="px-6 py-4 text-sm text-gray-900">
-                      <span
-                        v-if="cl.taller"
-                        class="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-3 py-0.5 text-xs font-medium"
-                      >
+                      <span v-if="cl.taller"
+                        class="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-3 py-0.5 text-xs font-medium">
                         {{ cl.taller?.nombre }}
                       </span>
                       <span v-else class="text-gray-500">—</span>
                     </td>
-
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {{ docenteLabel(cl) }}
                     </td>
-
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {{ cl.asistentes_maximos ?? "—" }}
                     </td>
-
                     <td class="px-6 py-4 whitespace-nowrap text-sm">
                       <span
                         v-if="isPasada(cl.fecha_hora)"
@@ -319,11 +319,11 @@ const docenteLabel = (clase) => {
             </div>
           </div>
         </div>
-
+        <!-- /Tabla -->
       </div>
     </div>
 
-    <!-- Modal de Clase (crear/editar) -->
+    <!-- Modal de Clase (reutilizado del Admin) -->
     <ClaseModal
       :show="showModal"
       :editing="editing"
@@ -332,7 +332,7 @@ const docenteLabel = (clase) => {
       @saved="handleSaved"
     />
 
-    <!-- Modal de Filtros -->
+    <!-- Modal de Filtros (reutilizado del Admin) -->
     <ClaseFiltrosModal
       :show="mostrarModalFiltros"
       :talleres="props.talleres"

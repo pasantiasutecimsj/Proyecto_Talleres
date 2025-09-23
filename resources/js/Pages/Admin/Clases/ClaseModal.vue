@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed, onMounted } from "vue"
+import { ref, watch, computed, onMounted, nextTick } from "vue"
 import axios from "axios"
 import { useForm } from "@inertiajs/vue3"
 
@@ -12,8 +12,7 @@ import InputError from "@/Components/InputError.vue"
 
 const props = defineProps({
   show: { type: Boolean, default: false },
-  // { id, fecha_hora, asistentes_maximos, taller:{id,nombre}, docente:{ci, nombre?, apellido?, ...} }
-  editing: { type: Object, default: null },
+  editing: { type: Object, default: null }, // { id, fecha_hora, asistentes_maximos, taller:{id,nombre}, docente:{ci, nombre?, ...} }
   talleres: { type: Array, default: () => [] }, // [{ id, nombre }]
 })
 
@@ -29,21 +28,50 @@ const form = useForm({
   ci_docente: "",
 })
 
+/* ===== Helpers/acciones que usan watchers (deben estar hoisted) ===== */
+function selectDocente(item) {
+  form.ci_docente = String(item.ci)
+  docenteDisplay.value = [item.nombre, item.ci].filter(Boolean).join(" · ")
+  docenteSearch.value = ""
+  docenteResults.value = []
+}
+
+function applyCiIfValid() {
+  const ci = (docenteSearch.value || "").trim()
+  if (/^\d{7,8}$/.test(ci)) {
+    form.ci_docente = ci
+    docenteDisplay.value = ci
+    docenteSearch.value = ""
+    docenteResults.value = []
+    docenteApiError.value = ""
+  }
+}
+
+function clearDocente() {
+  form.ci_docente = ""
+  docenteDisplay.value = ""
+}
+
 /* ============================
    Prefill (editar / nuevo)
    ============================ */
 const docenteDisplay = ref("") // etiqueta visible (Nombre · CI)
+const isPrefilling = ref(false)
+
 watch(
   () => props.editing,
-  (val) => {
+  async (val) => {
     form.clearErrors()
     if (val) {
+      isPrefilling.value = true
       form.fecha_hora = toInputDateTimeLocal(val.fecha_hora) || ""
       form.asistentes_maximos = String(val?.asistentes_maximos ?? 1)
       form.taller_id = val?.taller?.id ?? ""
-      form.ci_docente = val?.docente?.ci ?? ""
+      // setear docente seleccionado desde editing
       const nombre = [val?.docente?.nombre, val?.docente?.apellido].filter(Boolean).join(" ")
-      docenteDisplay.value = [nombre || val?.docente?.ci || ""].filter(Boolean).join("")
+      selectDocente({ ci: val?.docente?.ci ?? "", nombre: nombre || undefined })
+      await nextTick()
+      isPrefilling.value = false
     } else {
       form.reset()
       form.asistentes_maximos = "1"
@@ -56,7 +84,7 @@ watch(
 /* ============================
    Helpers de fecha/hora (input)
    ============================ */
-const toInputDateTimeLocal = (v) => {
+function toInputDateTimeLocal(v) {
   if (!v) return ""
   const d = new Date(v)
   if (isNaN(d.getTime())) return ""
@@ -88,9 +116,8 @@ const loadTopDocentes = async () => {
     const { data } = await axios.get(route("doc.docentes.top"), {
       params: { taller_id: form.taller_id },
     })
-    // Esperamos [{ ci, nombre, clases_count }] ordenado desc
     topDocentes.value = Array.isArray(data) ? data : []
-  } catch (e) {
+  } catch {
     topError.value = "No se pudo cargar el ranking de docentes."
   } finally {
     loadingTop.value = false
@@ -100,10 +127,12 @@ const loadTopDocentes = async () => {
 watch(
   () => form.taller_id,
   () => {
-    // Cambiar taller limpia selección y recarga ranking
-    clearDocente()
+    // Si el cambio de taller viene del prefill inicial, no borres el docente
+    if (!isPrefilling.value) {
+      clearDocente()
+    }
     loadTopDocentes()
-    // También reset del buscador
+    // reset buscador siempre
     docenteSearch.value = ""
     docenteResults.value = []
     docenteApiError.value = ""
@@ -114,15 +143,14 @@ onMounted(() => {
   if (form.taller_id) loadTopDocentes()
 })
 
-/* -------- Bloque 2: BUSCADOR (como antes) -------- */
+/* -------- Bloque 2: BUSCADOR -------- */
 const docenteSearch = ref("")
 const docenteResults = ref([]) // [{ ci, nombre, recomendado }]
 const buscandoDocentes = ref(false)
 const docenteApiError = ref("")
 let lastReqId = 0
 
-const minQueryOK = (s) =>
-  /^\d{7,8}$/.test(s ?? "") || (s ?? "").trim().length >= 2
+const minQueryOK = (s) => /^\d{7,8}$/.test(s ?? "") || (s ?? "").trim().length >= 2
 
 const searchDocentes = async () => {
   const q = docenteSearch.value?.trim()
@@ -132,14 +160,11 @@ const searchDocentes = async () => {
   const reqId = ++lastReqId
   buscandoDocentes.value = true
   try {
-    const params = {
-      q,
-      ...(form.taller_id ? { taller_id: form.taller_id } : {}),
-    }
+    const params = { q, ...(form.taller_id ? { taller_id: form.taller_id } : {}) }
     const { data } = await axios.get(route("admin.docentes.buscar"), { params })
     if (reqId !== lastReqId) return
     docenteResults.value = Array.isArray(data) ? data : []
-  } catch (e) {
+  } catch {
     if (reqId !== lastReqId) return
     docenteApiError.value = "No se pudo buscar docentes."
   } finally {
@@ -147,7 +172,7 @@ const searchDocentes = async () => {
   }
 }
 
-// Debounce simple para el buscador
+// Debounce simple
 let debounceTimer = null
 watch(
   () => docenteSearch.value,
@@ -162,31 +187,6 @@ watch(
     debounceTimer = setTimeout(searchDocentes, 300)
   }
 )
-
-/* ------------------ Selección común ------------------ */
-const selectDocente = (item) => {
-  form.ci_docente = String(item.ci)
-  docenteDisplay.value = [item.nombre, item.ci].filter(Boolean).join(" · ")
-  // limpiar buscador para evitar confusiones
-  docenteSearch.value = ""
-  docenteResults.value = []
-}
-
-const applyCiIfValid = () => {
-  const ci = (docenteSearch.value || "").trim()
-  if (/^\d{7,8}$/.test(ci)) {
-    form.ci_docente = ci
-    docenteDisplay.value = ci
-    docenteSearch.value = ""
-    docenteResults.value = []
-    docenteApiError.value = ""
-  }
-}
-
-const clearDocente = () => {
-  form.ci_docente = ""
-  docenteDisplay.value = ""
-}
 
 /* ======================
    Guardar / Cerrar
@@ -204,7 +204,6 @@ const canSubmit = computed(() => {
 })
 
 const submit = () => {
-  // Si el usuario dejó un CI válido sin seleccionar, aplicarlo
   if (!form.ci_docente && /^\d{7,8}$/.test(docenteSearch.value ?? "")) {
     form.ci_docente = docenteSearch.value.trim()
   }
@@ -225,6 +224,8 @@ const submit = () => {
 }
 </script>
 
+
+
 <template>
   <Modal :show="show" @close="close">
     <div class="p-6">
@@ -243,12 +244,9 @@ const submit = () => {
         <!-- Taller -->
         <div>
           <InputLabel for="c-taller" value="Taller*" />
-          <select
-            id="c-taller"
-            v-model="form.taller_id"
+          <select id="c-taller" v-model="form.taller_id"
             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-azul focus:ring-azul sm:text-sm"
-            required
-          >
+            required>
             <option value="" disabled>Seleccioná un taller</option>
             <option v-for="t in props.talleres" :key="t.id" :value="t.id">
               {{ t.nombre }}
@@ -271,20 +269,14 @@ const submit = () => {
 
           <!-- Tabs -->
           <div class="flex items-center gap-2 mb-3">
-            <button
-              type="button"
-              class="text-xs px-3 py-1.5 rounded-full border"
+            <button type="button" class="text-xs px-3 py-1.5 rounded-full border"
               :class="activeDocenteTab === 'ranking' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'"
-              @click="activeDocenteTab = 'ranking'"
-            >
+              @click="activeDocenteTab = 'ranking'">
               Más activos en el taller
             </button>
-            <button
-              type="button"
-              class="text-xs px-3 py-1.5 rounded-full border"
+            <button type="button" class="text-xs px-3 py-1.5 rounded-full border"
               :class="activeDocenteTab === 'buscar' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'"
-              @click="activeDocenteTab = 'buscar'"
-            >
+              @click="activeDocenteTab = 'buscar'">
               Buscar
             </button>
           </div>
@@ -295,13 +287,8 @@ const submit = () => {
               <p class="text-sm text-gray-600">
                 Docentes ordenados por <strong>clases dictadas</strong> en el taller seleccionado.
               </p>
-              <button
-                type="button"
-                class="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
-                @click="loadTopDocentes"
-                :disabled="loadingTop || !form.taller_id"
-                title="Refrescar"
-              >
+              <button type="button" class="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                @click="loadTopDocentes" :disabled="loadingTop || !form.taller_id" title="Refrescar">
                 Refrescar
               </button>
             </div>
@@ -315,20 +302,15 @@ const submit = () => {
               <div v-else-if="topError" class="px-3 py-2 text-xs text-red-600">{{ topError }}</div>
 
               <template v-else>
-                <button
-                  v-for="(d, idx) in topDocentes"
-                  :key="d.ci + '-' + idx"
-                  type="button"
+                <button v-for="(d, idx) in topDocentes" :key="d.ci + '-' + idx" type="button"
                   class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
-                  @click="selectDocente(d)"
-                >
+                  @click="selectDocente(d)">
                   <span class="truncate">
                     <strong>{{ d.nombre || "Sin nombre" }}</strong>
                     <span class="text-gray-500"> · {{ d.ci }}</span>
                   </span>
                   <span
-                    class="ml-2 inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-[10px] font-medium"
-                  >
+                    class="ml-2 inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-[10px] font-medium">
                     {{ d.clases_count }} clase{{ d.clases_count === 1 ? "" : "s" }}
                   </span>
                 </button>
@@ -346,34 +328,23 @@ const submit = () => {
               Buscá por <strong>CI</strong> (7–8 dígitos) o por <strong>nombre</strong>.
             </p>
 
-            <TextInput
-              v-model="docenteSearch"
-              type="text"
-              class="mt-1 block w-full"
-              placeholder="Ej. 12345678 o María Pérez"
-              @keydown.enter.prevent="applyCiIfValid"
-            />
+            <TextInput v-model="docenteSearch" type="text" class="mt-1 block w-full"
+              placeholder="Ej. 12345678 o María Pérez" @keydown.enter.prevent="applyCiIfValid" />
 
             <div class="max-h-48 overflow-auto rounded border divide-y">
               <div v-if="buscandoDocentes" class="px-3 py-2 text-xs text-gray-500">Buscando…</div>
               <div v-else-if="docenteApiError" class="px-3 py-2 text-xs text-red-600">{{ docenteApiError }}</div>
 
               <template v-else>
-                <button
-                  v-for="(d, idx) in docenteResults"
-                  :key="d.ci + '-' + idx"
-                  type="button"
+                <button v-for="(d, idx) in docenteResults" :key="d.ci + '-' + idx" type="button"
                   class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
-                  @click="selectDocente(d)"
-                >
+                  @click="selectDocente(d)">
                   <span class="truncate">
                     <strong>{{ d.nombre || "Sin nombre" }}</strong>
                     <span class="text-gray-500"> · {{ d.ci }}</span>
                   </span>
-                  <span
-                    v-if="d.recomendado"
-                    class="ml-2 inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-medium"
-                  >
+                  <span v-if="d.recomendado"
+                    class="ml-2 inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-medium">
                     Recomendado
                   </span>
                 </button>
@@ -397,7 +368,8 @@ const submit = () => {
         <!-- Cupo -->
         <div>
           <InputLabel for="c-cupo" value="Cupo (asistentes máximos)*" />
-          <TextInput id="c-cupo" v-model="form.asistentes_maximos" type="number" min="1" class="mt-1 block w-full" required />
+          <TextInput id="c-cupo" v-model="form.asistentes_maximos" type="number" min="1" class="mt-1 block w-full"
+            required />
           <InputError :message="form.errors.asistentes_maximos" class="mt-2" />
         </div>
 

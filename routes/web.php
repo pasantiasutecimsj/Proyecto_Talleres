@@ -112,6 +112,15 @@ Route::middleware(['api.auth', 'api.rol:docente'])->prefix('docente')->name('doc
         ->name('docentes.top');
 });
 
+Route::prefix('organizador')->name('organizador.')->group(function () {
+    Route::get('/talleres', [OrgTallerController::class, 'index'])
+        ->name('talleres.index');
 
+    Route::get('/clases', [OrgClaseController::class, 'index'])
+        ->name('clases.index');
+        
+    Route::match(['put','patch'], '/talleres/{taller}', [OrgTallerController::class, 'update'])
+        ->name('talleres.update');
+});
 
 require __DIR__ . '/auth.php';
