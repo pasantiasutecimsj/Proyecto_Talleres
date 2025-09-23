@@ -46,6 +46,7 @@ const sections = [
 ]
 
 const { props } = usePage()
+
 const userRoles = computed(() =>
   (props.auth?.roles ?? [])
     .map(r => {
@@ -103,9 +104,6 @@ const visibleSections = computed(() =>
               <div v-for="section in visibleSections" :key="section.key">
                 <div class="flex items-center justify-between mb-3">
                   <h4 class="text-base font-semibold text-gray-800">{{ section.title }}</h4>
-                  <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                    {{ section.key }}
-                  </span>
                 </div>
 
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

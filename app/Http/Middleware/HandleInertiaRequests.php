@@ -8,69 +8,73 @@ use App\Services\UsuariosApiService;
 
 class HandleInertiaRequests extends Middleware
 {
-    /**
-     * The root template that is loaded on the first page visit.
-     *
-     * @var string
-     */
     protected $rootView = 'app';
 
-    /**
-     * Determine the current asset version.
-     */
     public function version(Request $request): ?string
     {
         return parent::version($request);
     }
 
-    /**
-     * Define the props that are shared by default.
-     *
-     * @return array<string, mixed>
-     */
     public function share(Request $request): array
     {
         return array_merge(parent::share($request), [
-            'auth' => function () use ($request) {
-                /** Si no tenés token en sesión, no hay user */
+            'auth' => function () {
+                // Si no hay token, no hay usuario
                 if (!session()->has('usuarios_api.token')) {
-                    return ['user' => null, 'roles' => []];
+                    return ['user' => null, 'roles' => [], 'projectKey' => null];
                 }
 
                 try {
-                    // Trae el usuario desde la API 4010 (Bearer)
-                    if (!session()->has('usuarios_api.user')) {
-                        // Si no hay user en sesión, lo refrescamos
+                    // Cargar usuario desde sesión o refrescarlo desde la API
+                    $apiUser = session('usuarios_api.user');
+                    if (!$apiUser) {
                         $apiUser = app(UsuariosApiService::class)->me();
-                        session(['usuarios_api.user' => $apiUser, 'usuarios_api.user_fresh' => now()->timestamp]);
-                        //dd('Entró al IF');
-                    } else {
-                        // Si ya está en sesión, lo usamos directamente
-                        $apiUser = session('usuarios_api.user');
-                        //dd('Trajo del SESSION');
+                        session([
+                            'usuarios_api.user' => $apiUser,
+                            'usuarios_api.user_fresh' => now()->timestamp,
+                        ]);
                     }
 
-                    // Aplana los roles por nombre (únicos) para el navbar
-                    $roles = collect($apiUser['proyectos'] ?? [])
-                        ->flatMap(fn($p) => $p['roles'] ?? [])
-                        ->unique('id')   // elimina duplicados por id
+                    // Clave del proyecto requerido (misma fuente que en tu middleware)
+                    $proyectoClave = config('services.usuarios_api.proyecto_clave')
+                        ?? env('USUARIOS_API_PROYECTO_CLAVE');
+
+                    // Buscar el proyecto que coincide con la clave
+                    $proyecto = null;
+                    if ($apiUser && $proyectoClave) {
+                        $proyecto = collect($apiUser['proyectos'] ?? [])
+                            ->first(fn ($p) => ($p['clave'] ?? null) === $proyectoClave);
+                    }
+
+                    // Extraer SOLO los roles de ese proyecto, normalizados a minúsculas
+                    $rolesProyecto = collect($proyecto['roles'] ?? [])
+                        ->map(function ($r) {
+                            if (is_string($r)) return mb_strtolower(trim($r));
+                            $k = $r['clave'] ?? $r['nombre'] ?? $r['name'] ?? null;
+                            return $k ? mb_strtolower(trim($k)) : null;
+                        })
+                        ->filter()
+                        ->unique()   // unique por valor string
                         ->values()
                         ->all();
 
                     return [
-                        'user'  => [
+                        'user' => [
                             'id'    => $apiUser['id'] ?? null,
                             'name'  => $apiUser['name'] ?? null,
                             'email' => $apiUser['email'] ?? null,
+                            // Si te sirve en el front, podés enviar el proyecto actual también
+                            // 'project' => $proyecto,
                         ],
-                        // Si querés usar objetos de rol completos, también podés pasarlos;
-                        // para el navbar alcanza con nombres.
-                        'roles' => $roles,
+                        // Ahora SOLO roles del proyecto válido, ya normalizados: ['admin','organizador','docente']
+                        'roles'      => $rolesProyecto,
+                        'projectKey' => $proyectoClave,
                     ];
                 } catch (\Throwable $e) {
-                    // Token inválido/expirado → limpiar sesión para evitar loops
+                    // Token inválido/expirado → limpiar sesión
                     session()->forget('usuarios_api.token');
-                    return ['user' => null, 'roles' => []];
+                    session()->forget('usuarios_api.user');
+                    return ['user' => null, 'roles' => [], 'projectKey' => null];
                 }
             },
         ]);
