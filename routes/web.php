@@ -53,7 +53,7 @@ Route::middleware(['api.auth'])->group(function () {
 });
 
 // Rutas de admin
-Route::prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['api.auth', 'api.rol:Admin'])->prefix('admin')->name('admin.')->group(function () {
     // Talleres
     Route::get('/talleres', [TallerController::class, 'index'])->name('talleres.index');
     Route::post('/talleres', [TallerController::class, 'store'])->name('talleres.store');
@@ -83,7 +83,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/docentes/buscar', [DocenteController::class, 'buscar'])->name('docentes.buscar');
 });
 
-Route::prefix('organizador')->name('org.')->group(function () {
+Route::middleware(['api.auth', 'api.rol:organizador'])->prefix('organizador')->name('org.')->group(function () {
     // LISTADO DE TALLERES (organizador)
     Route::get('/talleres', [OrgTallerController::class, 'index'])
         ->name('talleres.index');
@@ -93,7 +93,7 @@ Route::prefix('organizador')->name('org.')->group(function () {
         ->name('clases.index');
 });
 
-Route::prefix('docente')->name('doc.')->group(function () {
+Route::middleware(['api.auth', 'api.rol:docente'])->prefix('docente')->name('doc.')->group(function () {
     // Mis clases (listado del docente)
     Route::get('/clases', [DocClaseController::class, 'index'])->name('clases.index');
 
