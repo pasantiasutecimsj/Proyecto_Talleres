@@ -46,7 +46,16 @@ const sections = [
 ]
 
 const { props } = usePage()
-const userRoles = computed(() => (props.auth?.roles ?? []).map(r => String(r).toLowerCase()))
+const userRoles = computed(() =>
+  (props.auth?.roles ?? [])
+    .map(r => {
+      if (typeof r === 'string') return r
+      if (r == null) return ''
+      return (r.clave ?? r.nombre ?? r.name ?? '').toString()
+    })
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean)
+)
 
 function hasAnyRole(required = []) {
   if (!required || required.length === 0) return true
