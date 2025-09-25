@@ -28,4 +28,5 @@ class ClaseController extends Controller
             'title' => 'Asistentes por clase (Docente)',
         ]);
     }
+    
 }

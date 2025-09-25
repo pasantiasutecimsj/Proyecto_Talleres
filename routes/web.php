@@ -110,6 +110,14 @@ Route::middleware(['api.auth', 'api.rol:docente'])->prefix('docente')->name('doc
     // Ranking de docentes por taller (para el modal de clases)
     Route::get('/docentes/top', [\App\Http\Controllers\Admin\DocenteController::class, 'top'])
         ->name('docentes.top');
+
+    // Lista de docentes (para selector)
+    Route::get('/api/docentes', [\App\Http\Controllers\Docente\CalendarioController::class, 'docentes'])
+        ->name('api.docentes.list');
+
+    // Clases por docente en rango
+    Route::get('/api/docentes/{ci}/clases', [\App\Http\Controllers\Docente\CalendarioController::class, 'clasesInRange'])
+        ->name('api.docentes.clases.range');
 });
 
 Route::prefix('organizador')->name('organizador.')->group(function () {
@@ -118,8 +126,8 @@ Route::prefix('organizador')->name('organizador.')->group(function () {
 
     Route::get('/clases', [OrgClaseController::class, 'index'])
         ->name('clases.index');
-        
-    Route::match(['put','patch'], '/talleres/{taller}', [OrgTallerController::class, 'update'])
+
+    Route::match(['put', 'patch'], '/talleres/{taller}', [OrgTallerController::class, 'update'])
         ->name('talleres.update');
 });
 
