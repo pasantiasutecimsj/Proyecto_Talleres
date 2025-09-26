@@ -118,6 +118,12 @@ Route::middleware(['api.auth', 'api.rol:docente'])->prefix('docente')->name('doc
     // Clases por docente en rango
     Route::get('/api/docentes/{ci}/clases', [\App\Http\Controllers\Docente\CalendarioController::class, 'clasesInRange'])
         ->name('api.docentes.clases.range');
+
+    Route::get('/api/clases/{clase}/asistentes', [\App\Http\Controllers\Docente\CalendarioController::class, 'asistentes'])
+        ->name('api.clases.asistentes');
+
+    Route::patch('/api/clases/{clase}/asistentes/{ci}', [\App\Http\Controllers\Docente\CalendarioController::class, 'updateAsistencia'])
+        ->name('api.clases.asistentes.update');
 });
 
 Route::prefix('organizador')->name('organizador.')->group(function () {
