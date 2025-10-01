@@ -4,6 +4,10 @@
     </IfModule>
 
     RewriteEngine On
+	
+	RewriteBase /talleres_imsj/
+	RewriteCond %{REQUEST_URI} ^/talleres_imsj/public/build/
+	RewriteRule ^ - [L]
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .

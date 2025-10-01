@@ -9,7 +9,7 @@ import { Link } from '@inertiajs/vue3';
         <div class="flex flex-col items-center bg-gradient-to-r from-azul to-azul-dark pt-8">
             <div>
                 <Link href="/">
-                    <img src="/images/San-Jose-LOGO-b.png" alt="Logo" class="mt-20 w-48 h-48" />
+                    <img src="/talleres_imsj/images/San-Jose-LOGO-b.png" alt="Logo" class="mt-20 w-48 h-48" />
                 </Link>
             </div>
 
