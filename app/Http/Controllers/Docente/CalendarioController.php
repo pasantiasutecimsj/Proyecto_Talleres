@@ -116,6 +116,7 @@ class CalendarioController extends Controller
                 'c.ci_docente',
                 'c.taller_id',
                 't.nombre as taller_nombre',
+                't.descripcion as taller_descripcion',
                 't.calle as taller_calle',
                 't.numero as taller_numero'
             )
@@ -135,6 +136,7 @@ class CalendarioController extends Controller
                 'ci_docente' => $row->ci_docente,
                 'taller_id' => $row->taller_id,
                 'taller_nombre' => $row->taller_nombre,
+                'taller_descripcion' => $row->taller_descripcion,
                 'taller_calle' => $row->taller_calle,
                 'taller_numero' => $row->taller_numero,
             ];
@@ -164,6 +166,7 @@ class CalendarioController extends Controller
                 'c.ci_docente',
                 'c.taller_id',
                 't.nombre as taller_nombre',
+                't.descripcion as taller_descripcion',
                 't.calle as taller_calle',
                 't.numero as taller_numero'
             )
@@ -219,6 +222,7 @@ class CalendarioController extends Controller
                 'asistentes_maximos' => $clase->asistentes_maximos,
                 'taller_id'          => $clase->taller_id,
                 'taller_nombre'      => $clase->taller_nombre,
+                'taller_descripcion' => $clase->taller_descripcion,
                 'taller_calle'       => $clase->taller_calle,
                 'taller_numero'      => $clase->taller_numero,
                 'totales'            => [

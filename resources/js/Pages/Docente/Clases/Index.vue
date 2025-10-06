@@ -9,6 +9,7 @@ import SecondaryButton from "@/Components/SecondaryButton.vue";
 import Modal from "@/Components/Modal.vue";
 import ClasesDayModal from "@/Pages/Docente/Clases/ModalClasesDia.vue";
 import ModalAsistentes from "@/Pages/Docente/Clases/ModalAsistentes.vue";
+import ModalTallerDetalle from "@/Pages/Docente/Clases/ModalTallerDetalle.vue";
 
 /* =========================
    Estado principal
@@ -41,6 +42,9 @@ const showDayModal = ref(false);
 const showAsistentesModal = ref(false);
 const claseSeleccionada = ref(null);
 
+// Modal "Ver taller"
+const showTallerModal = ref(false);
+const tallerDetail = ref(null);
 /* =========================
    Helpers de fecha/keys
    ========================= */
@@ -248,6 +252,11 @@ onMounted(() => {
   loadDocentes();
   loadClasesForSelected();
 });
+
+function openTaller(taller) {
+  tallerDetail.value = taller;
+  showTallerModal.value = true;
+}
 </script>
 
 <template>
@@ -405,11 +414,13 @@ onMounted(() => {
 
     <!-- Modal: clases del día -->
     <ClasesDayModal :show="showDayModal" :day="selectedDay" :clases="(clasesByDate[selectedDay] ?? [])"
-      @close="showDayModal = false" @ver-clase="openClase" />
+      @close="showDayModal = false" @ver-clase="openClase" @ver-taller="openTaller" />
 
     <!-- Placeholder hasta ModalAsistentes.vue -->
     <ModalAsistentes :show="showAsistentesModal" :claseId="claseSeleccionada?.id || null"
       @close="() => { showAsistentesModal = false; claseSeleccionada = null }" />
+
+    <ModalTallerDetalle :show="showTallerModal" :taller="tallerDetail" @close="showTallerModal = false" />
   </AuthenticatedLayout>
 </template>
 
