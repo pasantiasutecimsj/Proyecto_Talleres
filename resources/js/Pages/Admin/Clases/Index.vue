@@ -90,6 +90,16 @@ const docenteLabel = (clase) => {
   const base = [d.nombre, d.apellido].filter(Boolean).join(" ");
   return base || d.ci || "—";
 };
+
+const eliminar = (cl) => {
+  if (!cl || !cl.id) return;
+  if (confirm(`¿Eliminar la clase del ${fmtFechaHora(cl.fecha_hora)}?`)) {
+    router.delete(route("admin.clases.destroy", cl.id), {
+      preserveScroll: true,
+      onSuccess: () => router.reload({ only: ["clases", "filtros"] }),
+    });
+  }
+};
 </script>
 
 <template>
@@ -175,21 +185,22 @@ const docenteLabel = (clase) => {
               <table class="min-w-full table-auto">
                 <thead>
                   <tr class="bg-gray-50 border-b">
-                    <th class="w-1/5 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th class="w-1/5  px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Fecha / Hora
                     </th>
-                    <th class="w-1/4 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th class="w-1/4  px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Taller
                     </th>
-                    <th class="w-1/4 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th class="w-1/4  px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Docente
                     </th>
-                    <th class="w-1/6 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th class="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Cupo
                     </th>
-                    <th class="w-1/6 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th class="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Estado
                     </th>
+                    <th class="w-1/12 px-6 py-3"></th>
                   </tr>
                 </thead>
 
@@ -197,14 +208,13 @@ const docenteLabel = (clase) => {
                   <tr
                     v-for="cl in props.clases"
                     :key="cl.id"
-                    @click="openEdit(cl)"
-                    class="hover:bg-gray-50 hover:scale-95 transform transition-all duration-200 ease-in-out cursor-pointer"
+                    class="hover:bg-gray-50 transition"
                   >
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" @click="openEdit(cl)">
                       {{ fmtFechaHora(cl.fecha_hora) }}
                     </td>
 
-                    <td class="px-6 py-4 text-sm text-gray-900">
+                    <td class="px-6 py-4 text-sm text-gray-900" @click="openEdit(cl)">
                       <span
                         v-if="cl.taller"
                         class="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-3 py-0.5 text-xs font-medium"
@@ -214,15 +224,15 @@ const docenteLabel = (clase) => {
                       <span v-else class="text-gray-500">—</span>
                     </td>
 
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" @click="openEdit(cl)">
                       {{ docenteLabel(cl) }}
                     </td>
 
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" @click="openEdit(cl)">
                       {{ cl.asistentes_maximos ?? "—" }}
                     </td>
 
-                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm" @click="openEdit(cl)">
                       <span
                         v-if="isPasada(cl.fecha_hora)"
                         class="inline-flex items-center rounded-full bg-gray-200 text-gray-700 px-3 py-0.5 text-xs font-medium"
@@ -236,10 +246,23 @@ const docenteLabel = (clase) => {
                         Próxima
                       </span>
                     </td>
+
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
+                      <div class="flex gap-2 justify-end">
+                        <!-- Solo permitir eliminar si es futura -->
+                        <SecondaryButton
+                          v-if="!isPasada(cl.fecha_hora)"
+                          @click.stop="eliminar(cl)"
+                          class="!text-red-700"
+                        >
+                          Eliminar
+                        </SecondaryButton>
+                      </div>
+                    </td>
                   </tr>
 
                   <tr v-if="props.clases.length === 0">
-                    <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                    <td colspan="6" class="px-6 py-12 text-center text-gray-500">
                       No hay clases para mostrar.
                     </td>
                   </tr>

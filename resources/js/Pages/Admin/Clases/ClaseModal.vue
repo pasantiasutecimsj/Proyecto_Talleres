@@ -96,6 +96,16 @@ function toInputDateTimeLocal(v) {
   const mi = pad(d.getMinutes())
   return `${yyyy}-${mm}-${dd}T${hh}:${mi}`
 }
+function nowLocalForMin() {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, "0")
+  const yyyy = d.getFullYear()
+  const mm = pad(d.getMonth() + 1)
+  const dd = pad(d.getDate())
+  const hh = pad(d.getHours())
+  const mi = pad(d.getMinutes())
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`
+}
 
 /* ===================================================
    Docentes: dos bloques -> "ranking" y "buscar"
@@ -193,7 +203,16 @@ watch(
    ====================== */
 const close = () => emit("close")
 
+// ⚠️ Bloquea edición si la clase ya sucedió
+const isEditingPast = computed(() => {
+  const iso = props.editing?.fecha_hora
+  if (!iso) return false
+  const d = new Date(iso)
+  return !isNaN(d.getTime()) && d.getTime() < Date.now()
+})
+
 const canSubmit = computed(() => {
+  if (isEditingPast.value) return false
   return (
     !!form.fecha_hora &&
     Number(form.asistentes_maximos) >= 1 &&
@@ -224,8 +243,6 @@ const submit = () => {
 }
 </script>
 
-
-
 <template>
   <Modal :show="show" @close="close">
     <div class="p-6">
@@ -233,20 +250,40 @@ const submit = () => {
         {{ editing ? "Editar Clase" : "Nueva Clase" }}
       </h2>
 
+      <!-- Aviso cuando la clase ya pasó -->
+      <div
+        v-if="isEditingPast"
+        class="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+      >
+        Esta clase ya sucedió. No es posible editarla.
+      </div>
+
       <form @submit.prevent="submit" class="space-y-6">
         <!-- Fecha y hora -->
         <div>
           <InputLabel for="c-fecha" value="Fecha y hora*" />
-          <TextInput id="c-fecha" v-model="form.fecha_hora" type="datetime-local" class="mt-1 block w-full" required />
+          <TextInput
+            id="c-fecha"
+            v-model="form.fecha_hora"
+            type="datetime-local"
+            :min="nowLocalForMin()"
+            class="mt-1 block w-full"
+            required
+            :disabled="isEditingPast"
+          />
           <InputError :message="form.errors.fecha_hora" class="mt-2" />
         </div>
 
         <!-- Taller -->
         <div>
           <InputLabel for="c-taller" value="Taller*" />
-          <select id="c-taller" v-model="form.taller_id"
+          <select
+            id="c-taller"
+            v-model="form.taller_id"
             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-azul focus:ring-azul sm:text-sm"
-            required>
+            required
+            :disabled="isEditingPast"
+          >
             <option value="" disabled>Seleccioná un taller</option>
             <option v-for="t in props.talleres" :key="t.id" :value="t.id">
               {{ t.nombre }}
@@ -263,20 +300,28 @@ const submit = () => {
           <div v-if="form.ci_docente || docenteDisplay" class="mb-2 flex flex-wrap items-center gap-2">
             <span class="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-xs">
               {{ docenteDisplay || form.ci_docente }}
-              <button type="button" class="hover:text-indigo-950" @click="clearDocente">×</button>
+              <button type="button" class="hover:text-indigo-950" @click="clearDocente" :disabled="isEditingPast">×</button>
             </span>
           </div>
 
           <!-- Tabs -->
           <div class="flex items-center gap-2 mb-3">
-            <button type="button" class="text-xs px-3 py-1.5 rounded-full border"
+            <button
+              type="button"
+              class="text-xs px-3 py-1.5 rounded-full border"
               :class="activeDocenteTab === 'ranking' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'"
-              @click="activeDocenteTab = 'ranking'">
+              @click="activeDocenteTab = 'ranking'"
+              :disabled="isEditingPast"
+            >
               Más activos en el taller
             </button>
-            <button type="button" class="text-xs px-3 py-1.5 rounded-full border"
+            <button
+              type="button"
+              class="text-xs px-3 py-1.5 rounded-full border"
               :class="activeDocenteTab === 'buscar' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'"
-              @click="activeDocenteTab = 'buscar'">
+              @click="activeDocenteTab = 'buscar'"
+              :disabled="isEditingPast"
+            >
               Buscar
             </button>
           </div>
@@ -287,8 +332,13 @@ const submit = () => {
               <p class="text-sm text-gray-600">
                 Docentes ordenados por <strong>clases dictadas</strong> en el taller seleccionado.
               </p>
-              <button type="button" class="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
-                @click="loadTopDocentes" :disabled="loadingTop || !form.taller_id" title="Refrescar">
+              <button
+                type="button"
+                class="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                @click="loadTopDocentes"
+                :disabled="loadingTop || !form.taller_id || isEditingPast"
+                title="Refrescar"
+              >
                 Refrescar
               </button>
             </div>
@@ -302,15 +352,19 @@ const submit = () => {
               <div v-else-if="topError" class="px-3 py-2 text-xs text-red-600">{{ topError }}</div>
 
               <template v-else>
-                <button v-for="(d, idx) in topDocentes" :key="d.ci + '-' + idx" type="button"
+                <button
+                  v-for="(d, idx) in topDocentes"
+                  :key="d.ci + '-' + idx"
+                  type="button"
                   class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
-                  @click="selectDocente(d)">
+                  @click="selectDocente(d)"
+                  :disabled="isEditingPast"
+                >
                   <span class="truncate">
-                    <strong>{{ d.nombre || "Sin nombre" }}</strong>
+                    <strong>{{ d.nombre || 'Sin nombre' }}</strong>
                     <span class="text-gray-500"> · {{ d.ci }}</span>
                   </span>
-                  <span
-                    class="ml-2 inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-[10px] font-medium">
+                  <span class="ml-2 inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-[10px] font-medium">
                     {{ d.clases_count }} clase{{ d.clases_count === 1 ? "" : "s" }}
                   </span>
                 </button>
@@ -328,34 +382,51 @@ const submit = () => {
               Buscá por <strong>CI</strong> (7–8 dígitos) o por <strong>nombre</strong>.
             </p>
 
-            <TextInput v-model="docenteSearch" type="text" class="mt-1 block w-full"
-              placeholder="Ej. 12345678 o María Pérez" @keydown.enter.prevent="applyCiIfValid" />
+            <TextInput
+              v-model="docenteSearch"
+              type="text"
+              class="mt-1 block w-full"
+              placeholder="Ej. 12345678 o María Pérez"
+              @keydown.enter.prevent="applyCiIfValid"
+              :disabled="isEditingPast"
+            />
 
             <div class="max-h-48 overflow-auto rounded border divide-y">
               <div v-if="buscandoDocentes" class="px-3 py-2 text-xs text-gray-500">Buscando…</div>
               <div v-else-if="docenteApiError" class="px-3 py-2 text-xs text-red-600">{{ docenteApiError }}</div>
 
               <template v-else>
-                <button v-for="(d, idx) in docenteResults" :key="d.ci + '-' + idx" type="button"
+                <button
+                  v-for="(d, idx) in docenteResults"
+                  :key="d.ci + '-' + idx"
+                  type="button"
                   class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
-                  @click="selectDocente(d)">
+                  @click="selectDocente(d)"
+                  :disabled="isEditingPast"
+                >
                   <span class="truncate">
                     <strong>{{ d.nombre || "Sin nombre" }}</strong>
                     <span class="text-gray-500"> · {{ d.ci }}</span>
                   </span>
-                  <span v-if="d.recomendado"
-                    class="ml-2 inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-medium">
+                  <span
+                    v-if="d.recomendado"
+                    class="ml-2 inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-medium"
+                  >
                     Recomendado
                   </span>
                 </button>
 
-                <div v-if="!docenteResults.length && /^\d{7,8}$/.test(docenteSearch)"
-                  class="px-3 py-2 text-xs text-gray-600">
+                <div
+                  v-if="!docenteResults.length && /^\d{7,8}$/.test(docenteSearch)"
+                  class="px-3 py-2 text-xs text-gray-600"
+                >
                   Presioná Enter para usar la CI <strong>{{ docenteSearch }}</strong>.
                 </div>
 
-                <div v-if="!docenteResults.length && !/^\d{7,8}$/.test(docenteSearch)"
-                  class="px-3 py-2 text-xs text-gray-500">
+                <div
+                  v-if="!docenteResults.length && !/^\d{7,8}$/.test(docenteSearch)"
+                  class="px-3 py-2 text-xs text-gray-500"
+                >
                   Escribí al menos 2 caracteres para buscar por nombre.
                 </div>
               </template>
@@ -368,8 +439,15 @@ const submit = () => {
         <!-- Cupo -->
         <div>
           <InputLabel for="c-cupo" value="Cupo (asistentes máximos)*" />
-          <TextInput id="c-cupo" v-model="form.asistentes_maximos" type="number" min="1" class="mt-1 block w-full"
-            required />
+          <TextInput
+            id="c-cupo"
+            v-model="form.asistentes_maximos"
+            type="number"
+            min="1"
+            class="mt-1 block w-full"
+            required
+            :disabled="isEditingPast"
+          />
           <InputError :message="form.errors.asistentes_maximos" class="mt-2" />
         </div>
 

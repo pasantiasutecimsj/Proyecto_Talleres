@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
-import { Head } from "@inertiajs/vue3";
+import { Head, router } from "@inertiajs/vue3";
 import { ref, computed } from "vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
 import SecondaryButton from "@/Components/SecondaryButton.vue";
@@ -10,17 +10,19 @@ import TallerFiltrosModal from "./TallerFiltrosModal.vue";
 const props = defineProps({
   talleres: Array,
   ciudades: Array, // [{id, nombre, ...}]
+  filtros: Object, // { nombre, ciudad, estado }
 });
 
 // ====== Estado UI ======
 const showModal = ref(false);
 const editingTaller = ref(null);
 
-// Filtros
+// Filtros (sincronizados con backend)
 const mostrarModalFiltros = ref(false);
 const filtros = ref({
-  nombre: "",   // busca en nombre y descripción
-  ciudad: "",   // id_ciudad
+  nombre: props.filtros?.nombre ?? "",
+  ciudad: props.filtros?.ciudad ?? "",
+  estado: props.filtros?.estado ?? "activos", // activos | inactivos | todos
 });
 
 // ====== Orden ciudades (solo para mostrar chips) ======
@@ -33,7 +35,7 @@ const filteredTalleres = computed(() => {
   const term = (filtros.value.nombre || "").trim().toLowerCase();
   const ciudad = filtros.value.ciudad ? String(filtros.value.ciudad) : "";
 
-  return props.talleres.filter((t) => {
+  return (props.talleres || []).filter((t) => {
     const okCiudad = !ciudad || String(t.id_ciudad) === ciudad;
     const txt = `${t.nombre ?? ""} ${t.descripcion ?? ""}`.toLowerCase();
     const okNombre = !term || txt.includes(term);
@@ -51,13 +53,42 @@ const closeModal = () => {
   editingTaller.value = null;
 };
 const handleSaved = () => {
-  // Si el store/update no redirige, acá podrías forzar un refresh con router.reload().
   closeModal();
+  // Si lo querés “sin recargar”, podríamos hacer un partial reload:
+  router.reload({ only: ["talleres", "filtros"] });
 };
 
-// ====== Filtros (acciones de banner) ======
+// ====== Acciones lógica Activo ======
+const desactivar = (taller) => {
+  if (confirm(`¿Desactivar el taller "${taller.nombre}"?`)) {
+    router.delete(route("admin.talleres.destroy", taller.id), {
+      preserveScroll: true,
+      onSuccess: () => router.reload({ only: ["talleres", "filtros"] }),
+    });
+  }
+};
+
+const restaurar = (taller) => {
+  if (confirm(`¿Restaurar el taller "${taller.nombre}"?`)) {
+    router.patch(route("admin.talleres.restore", taller.id), {}, {
+      preserveScroll: true,
+      onSuccess: () => router.reload({ only: ["talleres", "filtros"] }),
+    });
+  }
+};
+
+// ====== Filtros (banner) ======
 const limpiarFiltros = () => {
-  filtros.value = { nombre: "", ciudad: "" };
+  filtros.value = { nombre: "", ciudad: "", estado: filtros.value.estado };
+  // No tocamos "estado" al limpiar filtros de texto
+};
+
+const aplicarFiltrosServidor = () => {
+  router.get(route("admin.talleres.index"), {
+    nombre: filtros.value.nombre || "",
+    ciudad: filtros.value.ciudad || "",
+    estado: filtros.value.estado || "activos",
+  }, { preserveState: true, replace: true });
 };
 </script>
 
@@ -65,7 +96,6 @@ const limpiarFiltros = () => {
   <Head title="Talleres (Administrador)" />
 
   <AuthenticatedLayout>
-    <!-- Header -->
     <template #header>
       <div>
         <h2 class="text-xl font-semibold leading-tight text-gray-800">
@@ -80,7 +110,7 @@ const limpiarFiltros = () => {
     <div class="py-12">
       <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
         <!-- Header con acciones -->
-        <div class="mb-6 flex items-center justify-between">
+        <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 class="text-lg font-medium text-gray-900 mb-1">
               Gestión de Talleres
@@ -89,7 +119,18 @@ const limpiarFiltros = () => {
               Administrá los talleres: nombre, descripción y ubicación.
             </p>
           </div>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2 items-center">
+            <!-- Estado -->
+            <label class="text-sm text-gray-700">Estado:</label>
+            <select
+              v-model="filtros.estado"
+              @change="aplicarFiltrosServidor"
+              class="rounded-md border-gray-300 text-sm"
+            >
+              <option value="activos">Activos</option>
+              <option value="inactivos">Inactivos</option>
+            </select>
+
             <PrimaryButton @click="mostrarModalFiltros = true">🔎︎ Filtros</PrimaryButton>
             <PrimaryButton @click="openModal()">+ Nuevo Taller</PrimaryButton>
           </div>
@@ -110,7 +151,7 @@ const limpiarFiltros = () => {
             </div>
 
             <SecondaryButton @click="limpiarFiltros" class="!py-1 !px-3 text-sm">
-              Limpiar filtros
+              Limpiar filtros (locales)
             </SecondaryButton>
           </div>
 
@@ -138,7 +179,6 @@ const limpiarFiltros = () => {
         <!-- Card tabla -->
         <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
           <div class="p-6 text-gray-900">
-            <!-- Tabla -->
             <div class="overflow-x-auto">
               <p class="text-gray-600 mb-4">
                 → Para editar un taller, hacé clic en la fila correspondiente.
@@ -147,18 +187,11 @@ const limpiarFiltros = () => {
               <table class="min-w-full table-auto">
                 <thead>
                   <tr class="bg-gray-50 border-b">
-                    <th class="w-1/5 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ciudad
-                    </th>
-                    <th class="w-1/5 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nombre
-                    </th>
-                    <th class="w-2/5 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Descripción
-                    </th>
-                    <th class="w-1/5 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Dirección
-                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ciudad</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dirección</th>
+                    <th class="px-6 py-3"></th>
                   </tr>
                 </thead>
 
@@ -166,25 +199,35 @@ const limpiarFiltros = () => {
                   <tr
                     v-for="taller in filteredTalleres"
                     :key="taller.id"
-                    @click="openModal(taller)"
-                    class="hover:bg-gray-50 hover:scale-95 transform transition-all duration-200 ease-in-out cursor-pointer"
+                    class="hover:bg-gray-50 transition-colors"
                   >
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" @click="openModal(taller)">
                       {{ taller.ciudad || '—' }}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" @click="openModal(taller)">
                       {{ taller.nombre }}
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-900">
+                    <td class="px-6 py-4 text-sm text-gray-900" @click="openModal(taller)">
                       <span class="line-clamp-2">{{ taller.descripcion || '—' }}</span>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" @click="openModal(taller)">
                       {{ [taller.calle, taller.numero].filter(Boolean).join(' ') || '—' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
+                      <div class="flex gap-2 justify-end">
+                        <!-- Si viene desde 'inactivos' o 'todos', podría estar Activo = 0 -->
+                        <template v-if="taller.Activo === false">
+                          <SecondaryButton @click="restaurar(taller)">Restaurar</SecondaryButton>
+                        </template>
+                        <template v-else>
+                          <SecondaryButton @click="desactivar(taller)">Desactivar</SecondaryButton>
+                        </template>
+                      </div>
                     </td>
                   </tr>
 
                   <tr v-if="filteredTalleres.length === 0">
-                    <td colspan="4" class="px-6 py-12 text-center text-gray-500">
+                    <td colspan="5" class="px-6 py-12 text-center text-gray-500">
                       No hay talleres para mostrar.
                     </td>
                   </tr>
@@ -206,12 +249,13 @@ const limpiarFiltros = () => {
       @saved="handleSaved"
     />
 
-    <!-- Modal Filtros (componente hijo) -->
+    <!-- Modal Filtros -->
     <TallerFiltrosModal
       :show="mostrarModalFiltros"
       v-model:filtros="filtros"
       :ciudades="props.ciudades"
       @close="mostrarModalFiltros = false"
+      @apply="aplicarFiltrosServidor"
     />
   </AuthenticatedLayout>
 </template>

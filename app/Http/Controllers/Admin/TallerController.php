@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Taller;
-use App\Services\RegistroPersonasService; // ⬅️ ojo con el namespace (en tu proyecto está como App\Services)
+use App\Services\RegistroPersonasService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -20,12 +20,16 @@ class TallerController extends Controller
      */
     public function index(Request $request)
     {
-        // --- 1) Leer filtros del request ---
-        $term    = trim((string) $request->input('nombre', ''));   // busca en nombre + descripcion
-        $ciudad  = $request->input('ciudad');                      // id_ciudad
+        $term    = trim((string) $request->input('nombre', '')); // busca en nombre + descripcion
+        $ciudad  = $request->input('ciudad');                    // id_ciudad
+        $estado  = $request->input('estado', 'activos');         // activos | inactivos | todos
 
-        // --- 2) Query con filtros ---
-        $q = Taller::query();
+        // Query base: por defecto con scope global (activos)
+        $q = match ($estado) {
+            'inactivos' => Taller::soloInactivos(),
+            'todos'     => Taller::conInactivos(),
+            default     => Taller::query(), // activos (scope global)
+        };
 
         if ($ciudad !== null && $ciudad !== '') {
             $q->where('id_ciudad', $ciudad);
@@ -33,60 +37,58 @@ class TallerController extends Controller
 
         if ($term !== '') {
             $q->where(function ($sub) use ($term) {
-                $sub->where('nombre', 'like', "%{$term}%")
-                    ->orWhere('descripcion', 'like', "%{$term}%");
+                $termLike = "%{$term}%";
+                $sub->where('nombre', 'like', $termLike)
+                    ->orWhere('descripcion', 'like', $termLike);
             });
         }
 
         $talleres = $q->orderBy('id_ciudad')->orderBy('nombre')->get();
 
-        // --- 3) Catálogo de ciudades desde api_personas ---
+        // Catálogo de ciudades desde api_personas (por ahora)
         $ciudadesResp = $this->registroPersonasService->getCiudades()->json();
         $ciudades = collect($ciudadesResp['ciudades'] ?? []);
 
-        // --- 4) Enriquecer con nombre de ciudad ---
+        // Enriquecer con nombre de ciudad
         $talleresConCiudad = $talleres->map(function ($t) use ($ciudades) {
             $ciudad = $ciudades->firstWhere('id', $t->id_ciudad);
             $t->ciudad = $ciudad['nombre'] ?? null;
             return $t;
         })->values();
 
-        // --- 5) Retornar a la vista con filtros para hidratar el modal/banner ---
         return Inertia::render('Admin/Talleres/Index', [
             'talleres' => $talleresConCiudad,
             'ciudades' => $ciudades->sortBy('nombre')->values()->all(),
             'filtros'  => [
                 'nombre' => $term,
                 'ciudad' => $ciudad ?? '',
+                'estado' => $estado,
             ],
         ]);
     }
 
-
     /**
      * POST /admin/talleres
-     * Crear taller (usado por el modal "Nuevo Taller").
      */
     public function store(Request $request)
     {
         $data = $request->validate([
             'nombre'      => ['required', 'string', 'max:255'],
             'descripcion' => ['nullable', 'string'],
-            'id_ciudad'   => ['required'], // validación contra API la hacemos después si querés
+            'id_ciudad'   => ['required'],
             'calle'       => ['nullable', 'string', 'max:255'],
             'numero'      => ['nullable', 'string', 'max:50'],
         ]);
 
+        // Activo true por defecto (lo pone la migración); si quisieras, $data['Activo'] = true;
         Taller::create($data);
 
-        return redirect()
-            ->route('admin.talleres.index')
+        return redirect()->route('admin.talleres.index')
             ->with('success', 'Taller creado exitosamente.');
     }
 
     /**
      * PUT/PATCH /admin/talleres/{taller}
-     * Actualizar taller (usado por el modal "Editar Taller").
      */
     public function update(Request $request, Taller $taller)
     {
@@ -100,8 +102,33 @@ class TallerController extends Controller
 
         $taller->update($data);
 
-        return redirect()
-            ->route('admin.talleres.index')
+        return redirect()->route('admin.talleres.index')
             ->with('success', 'Taller actualizado exitosamente.');
+    }
+
+    /**
+     * DELETE /admin/talleres/{taller}
+     * → Borrado lógico (Activo = 0)
+     */
+    public function destroy(Taller $taller)
+    {
+        $taller->desactivar();
+
+        return redirect()->route('admin.talleres.index')
+            ->with('success', 'Taller desactivado.');
+    }
+
+    /**
+     * PATCH /admin/talleres/{taller}/restore
+     * → Restaurar (Activo = 1)
+     */
+    public function restore($id)
+    {
+        // Necesitamos ver incluso si está inactivo
+        $taller = Taller::conInactivos()->findOrFail($id);
+        $taller->restaurar();
+
+        return redirect()->route('admin.talleres.index', ['estado' => 'todos'])
+            ->with('success', 'Taller restaurado.');
     }
 }
