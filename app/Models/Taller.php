@@ -25,8 +25,12 @@ class Taller extends Model
 
     public function organizadores()
     {
-        // Si Organizador usa HasActivo, viene filtrado
-        return $this->belongsToMany(Organizador::class, 'talleres_organizadores', 'taller_id', 'ci_organizador')
-                    ->withTimestamps();
+        // Pivot actualizado: organizador_user_id ↔ organizadores.user_id
+        return $this->belongsToMany(
+            Organizador::class,
+            'talleres_organizadores',
+            'taller_id',            // FK en pivot hacia este modelo (taller)
+            'organizador_user_id'   // FK en pivot hacia Organizador
+        )->withTimestamps();
     }
 }

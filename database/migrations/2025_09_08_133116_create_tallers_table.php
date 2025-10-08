@@ -1,6 +1,6 @@
 <?php
+// database/migrations/2025_01_01_000030_create_talleres_table.php
 
-// 2025_01_01_000030_create_talleres_table.php
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -11,14 +11,17 @@ return new class extends Migration {
             $table->id();
             $table->string('nombre');
             $table->text('descripcion')->nullable();
-            $table->unsignedBigInteger('id_ciudad'); // viene de api_personas (referencia externa)
-            $table->string('calle')->nullable();     // el * del diagrama lo tomo como opcional
+            $table->unsignedBigInteger('id_ciudad'); // referencia externa (api_personas)
+            $table->string('calle')->nullable();
             $table->string('numero', 20)->nullable();
+
+            $table->boolean('Activo')->default(true)->index();
             $table->timestamps();
 
-            $table->index('id_ciudad'); // índice para consultas, sin FK real
+            $table->index('id_ciudad');
         });
     }
+
     public function down(): void {
         Schema::dropIfExists('talleres');
     }

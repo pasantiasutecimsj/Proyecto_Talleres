@@ -10,17 +10,23 @@ class Organizador extends Model
     use HasActivo;
 
     protected $table = 'organizadores';
-    protected $primaryKey = 'ci';
-    public $incrementing = false;
-    protected $keyType = 'string';
 
-    protected $fillable = ['ci', 'Activo'];
+    // PK ahora es el ID remoto de api_usuarios
+    protected $primaryKey = 'user_id';
+    public $incrementing = false;   // viene de otra API
+    protected $keyType = 'int';
+
+    protected $fillable = ['user_id', 'ci', 'Activo'];
     protected $casts   = ['Activo' => 'boolean'];
 
     public function talleres()
     {
-        // Si Taller usa HasActivo, ya viene filtrado por Activo=1
-        return $this->belongsToMany(Taller::class, 'talleres_organizadores', 'ci_organizador', 'taller_id')
-                    ->withTimestamps();
+        // Pivot ajustado a organizador_user_id
+        return $this->belongsToMany(
+            Taller::class,
+            'talleres_organizadores',
+            'organizador_user_id', // FK en pivot hacia este modelo
+            'taller_id'            // FK en pivot hacia Taller
+        )->withTimestamps();
     }
 }
