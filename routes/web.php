@@ -66,8 +66,8 @@ Route::middleware(['api.auth', 'api.rol:Admin'])->prefix('admin')->name('admin.'
     Route::post('/organizadores', [OrganizadorController::class, 'store'])->name('organizadores.store');
     Route::match(['put', 'patch'], '/organizadores/{organizador}', [OrganizadorController::class, 'update'])->name('organizadores.update');
     Route::delete('/organizadores/{organizador}', [OrganizadorController::class, 'destroy'])->name('organizadores.destroy');
-    Route::patch('/organizadores/{ci}/restore', [OrganizadorController::class, 'restore'])->name('organizadores.restore');
-
+    Route::patch('/organizadores/{user_id}/restore', [OrganizadorController::class, 'restore'])->name('organizadores.restore');
+    
     // Auxiliares para el modal (prefill y check de existencia) de DOCENTES
     Route::get('docentes/persona/{ci}', [DocenteController::class, 'persona'])
         ->name('docentes.persona');
@@ -88,6 +88,11 @@ Route::middleware(['api.auth', 'api.rol:Admin'])->prefix('admin')->name('admin.'
     Route::get('/docentes/buscar', [DocenteController::class, 'buscar'])->name('docentes.buscar');
     Route::delete('/admin/docentes/{docente}', [DocenteController::class, 'destroy'])->name('docentes.destroy');
     Route::patch('/admin/docentes/{docente}/restore', [DocenteController::class, 'restore'])->name('docentes.restore');
+
+    // Buscar usuarios.
+    Route::get('/usuarios/buscar', [\App\Http\Controllers\Admin\OrganizadorController::class, 'buscarUsuarios'])
+    ->name('usuarios.buscar');
+
 });
 
 Route::middleware(['api.auth', 'api.rol:organizador'])->prefix('organizador')->name('org.')->group(function () {

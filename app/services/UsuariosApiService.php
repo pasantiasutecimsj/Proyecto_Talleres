@@ -12,26 +12,26 @@ class UsuariosApiService
         $this->base = rtrim(config('services.usuarios_api.base_url', 'http://localhost:4010'), '/');
     }
 
-// ENDPOINTS DE USER
+    // ENDPOINTS DE USER
     /** Traer los datos del usuario Auth usando Bearer */
-        public function me(): array
-        {
-            $token = $this->getToken();
-            if (!$token) {
-                throw new \RuntimeException('No autenticado', 401);
-            }
-
-            $res = $this->client($token)->get('/api/user');
-            if ($res->failed()) {
-                // Si el token expiró/revocado:
-                if ($res->status() === 401) {
-                    $this->clearToken();
-                }
-                throw new \RuntimeException($res->json('message') ?? 'No autenticado', $res->status());
-            }
-
-            return $res->json();
+    public function me(): array
+    {
+        $token = $this->getToken();
+        if (!$token) {
+            throw new \RuntimeException('No autenticado', 401);
         }
+
+        $res = $this->client($token)->get('/api/user');
+        if ($res->failed()) {
+            // Si el token expiró/revocado:
+            if ($res->status() === 401) {
+                $this->clearToken();
+            }
+            throw new \RuntimeException($res->json('message') ?? 'No autenticado', $res->status());
+        }
+
+        return $res->json();
+    }
 
     /** Traer los datos de todos los usuarios usando Bearer */
     public function listUsers(array $params = []): array
@@ -83,7 +83,7 @@ class UsuariosApiService
         return $res->json();
     }
 
-// ENDPOINTS DE PROYECTOS
+    // ENDPOINTS DE PROYECTOS
     /** Obtener un proyecto por ID */
     public function getProject(int $id): array
     {
@@ -156,8 +156,10 @@ class UsuariosApiService
      * Usuarios del proyecto (ideal: que la API ya incluya roles del usuario EN ESE proyecto)
      * Acepta filtros/paginación: page, per_page, busqueda, rol (id), activo, etc.
      */
-    public function getProjectUsers(int $projectId, array $params = []): array {
-        $token = $this->getToken(); if(!$token) throw new \RuntimeException('No autenticado',401);
+    public function getProjectUsers(int $projectId, array $params = []): array
+    {
+        $token = $this->getToken();
+        if (!$token) throw new \RuntimeException('No autenticado', 401);
         $res = $this->client($token)->get("/api/project/{$projectId}/users", $params);
         if ($res->failed()) throw new \RuntimeException($res->json('message') ?? 'No se pudo obtener usuarios del proyecto', $res->status());
         return $res->json();
@@ -176,7 +178,7 @@ class UsuariosApiService
         return $res->json();
     }
 
-// ENDPOINTS DE ROLES
+    // ENDPOINTS DE ROLES
     /** Obtener un rol por ID */
     public function getRole(int $id): array
     {
@@ -216,7 +218,7 @@ class UsuariosApiService
         return $res->json();
     }
 
-// ENDPOINTS DE AUTENTIFICACIÓN
+    // ENDPOINTS DE AUTENTIFICACIÓN
     private function client(?string $token = null)
     {
         $req = Http::baseUrl($this->base)->acceptJson();
@@ -265,7 +267,7 @@ class UsuariosApiService
         $me = $this->client($token)->get('/api/user')->json();
         session([
             'usuarios_api.user'      => $me,
-            'usuarios_api.user_fresh'=> now()->timestamp, // para expiración
+            'usuarios_api.user_fresh' => now()->timestamp, // para expiración
         ]);
     }
 
@@ -275,10 +277,13 @@ class UsuariosApiService
         $token = $this->getToken();
         if ($token) {
             // Revocá el token actual (ignorar errores de red)
-            try { $this->client($token)->post('/api/auth/logout'); } catch (\Throwable) {}
+            try {
+                $this->client($token)->post('/api/auth/logout');
+            } catch (\Throwable) {
+            }
         }
         $this->clearToken();
-        session()->forget(['usuarios_api.user','usuarios_api.user_fresh']);
+        session()->forget(['usuarios_api.user', 'usuarios_api.user_fresh']);
     }
 
     // helpers
@@ -294,8 +299,20 @@ class UsuariosApiService
         $me = $this->client($token)->get('/api/user')->json();
         session([
             'usuarios_api.user'      => $me,
-            'usuarios_api.user_fresh'=> now()->timestamp,
+            'usuarios_api.user_fresh' => now()->timestamp,
         ]);
         return $me;
+    }
+
+    public function getUser(int $id): array
+    {
+        $token = $this->getToken();
+        if (!$token) throw new \RuntimeException('No autenticado', 401);
+
+        $res = $this->client($token)->get("/api/user/{$id}");
+        if ($res->failed()) {
+            throw new \RuntimeException($res->json('message') ?? 'No se pudo obtener el usuario', $res->status());
+        }
+        return $res->json();
     }
 }
